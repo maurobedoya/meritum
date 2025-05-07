@@ -6,7 +6,7 @@
 
 A tool for tracking student progress using Gantt charts and task management, designed especially for academic contexts like undergraduate and Ph.D. programs.
 
-[<img align="center" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/04_meritum.PNG" width="800" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/04_meritum.PNG)
+[<img align="center" src="./meritum/assets/04_meritum.PNG" width="800" />](.//meritum/assets/04_meritum.PNG)
 
 ## Features
 
