@@ -1,14 +1,12 @@
 # meritum
-A tool for tracking student progress using Gantt charts and task management
-
-![Meritum](meritum/assets/04_meritum.png)
-
 
 ![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![PyPI](https://img.shields.io/pypi/v/meritum)](https://pypi.org/project/meritum/)
 
 A tool for tracking student progress using Gantt charts and task management, designed especially for academic contexts like undergraduate and Ph.D. programs.
+
+[<img align="center" src="./meritum/assets/04_meritum.PNG" width="800" />](.//meritum/assets/04_meritum.PNG)
 
 ## Features
 
@@ -47,6 +45,7 @@ meritum
 ```
 
 On first run, you'll be prompted to choose either Teacher or Student mode.
+[<img align="right" src="./meritum/assets/01_meritum.PNG" width="300" />](.//meritum/assets/01_meritum.PNG)
 
 ### Teacher Mode
 
@@ -64,9 +63,10 @@ Students can:
 - Add notes to tasks
 - View their project timeline through Gantt charts
 
-## Screenshots
+## Adding students
 
-[Add your screenshots here]
+[<img align="center" src="./meritum/assets/03_meritum.PNG" width="800" />](./meritum/assets/03_meritum.PNG)
+
 
 ## Requirements
 
