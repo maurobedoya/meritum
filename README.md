@@ -6,7 +6,7 @@
 
 A tool for tracking student progress using Gantt charts and task management, designed especially for academic contexts like undergraduate and Ph.D. programs.
 
-![meritum](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/04_meritum.PNG)
+![meritum](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/04_meritum.png)
 
 ## Features
 
@@ -45,7 +45,7 @@ meritum
 ```
 
 On first run, you'll be prompted to choose either Teacher or Student mode.
-[<img align="right" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.PNG" width="300" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.PNG)
+[<img align="right" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.png" width="300" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.png)
 
 ### Teacher Mode
 
