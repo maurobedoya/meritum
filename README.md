@@ -45,7 +45,7 @@ meritum
 ```
 
 On first run, you'll be prompted to choose either Teacher or Student mode.
-[<img align="right" src="./meritum/assets/01_meritum.PNG" width="300" />](.//meritum/assets/01_meritum.PNG)
+[<img align="right" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.PNG" width="300" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.PNG)
 
 ### Teacher Mode
 
