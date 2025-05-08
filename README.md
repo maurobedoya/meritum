@@ -45,7 +45,7 @@ meritum
 ```
 
 On first run, you'll be prompted to choose either Teacher or Student mode.
-[<img align="right" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.png" width="300" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/01_meritum.png)
+[<img align="right" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_select_mode.png" width="300" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_select_mode.png)
 
 ### Teacher Mode
 
@@ -65,7 +65,7 @@ Students can:
 
 ## Adding students
 
-[<img align="center" src="./meritum/assets/03_meritum.PNG" width="800" />](./meritum/assets/03_meritum.PNG)
+[<img align="center" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_student.png" width="800" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_student.png)
 
 
 ## Requirements
