@@ -2,7 +2,7 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
-[![PyPI](https://img.shields.io/pypi/v/meritum?color=blue)](https://pypi.org/project/meritum/)
+[![PyPI](https://img.shields.io/pypi/v/meritum?color=orange)](https://pypi.org/project/meritum/)
 
 A tool for tracking student progress using Gantt charts and task management, designed especially for academic contexts like undergraduate and Ph.D. programs.
 
