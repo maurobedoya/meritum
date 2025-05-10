@@ -33,6 +33,12 @@ Or install directly from GitHub for the latest version:
 pip install git+https://github.com/maurobedoya/meritum.git
 ```
 
+To update to the latest version (since we are making a lot of changes ;) ) use:
+
+```bash
+pip install --upgrade meritum
+```
+
 ## Usage
 
 After installation, simply run:
