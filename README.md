@@ -68,6 +68,15 @@ Students can:
 [<img align="center" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_student.png" width="800" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_student.png)
 
 
+## Adding goals
+
+[<img align="center" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_goals.png" width="800" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_goals.png)
+
+## Adding tasks
+
+[<img align="center" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_tasks.png" width="800" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_tasks.png)
+
+
 ## Requirements
 
 - Python 3.7 or higher
