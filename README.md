@@ -12,7 +12,9 @@ A tool for tracking student progress using Gantt charts and task management, des
 
 - **Dual Mode Interface**: Separate views for teachers and students
 - **Visual Progress Tracking**: Intuitive Gantt charts for project visualization
+- **Goals Management**: Create and track goals with customizable colors
 - **Task Management**: Create, assign, and track tasks with deadlines
+- **Goal-Task Association**: Link tasks to specific goals for better organization and progress tracking
 - **Progress History**: Detailed history of task completion and progress
 - **Note Taking**: Add detailed notes to tasks for better context
 - **Profile Management**: Keep detailed student profiles in one place
@@ -51,7 +53,8 @@ On first run, you'll be prompted to choose either Teacher or Student mode.
 
 Teachers can:
 - Manage multiple student profiles
-- Create and assign tasks
+- Create goals and objectives for students
+- Create and assign tasks linked to specific goals
 - Track progress across different students
 - Add notes and feedback to student work
 
