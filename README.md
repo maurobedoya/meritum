@@ -79,7 +79,7 @@ Students can:
 
 ## Adding goals
 
-[<img align="center" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_goals.png" width="800" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_goals.png)
+[<img align="center" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_goals2.png" width="800" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_add_goals2.png)
 
 ## Adding tasks
 
