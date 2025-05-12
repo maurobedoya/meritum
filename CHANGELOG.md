@@ -7,6 +7,20 @@ All notable changes to Meritum will be documented in this file.
 ### Added
 - Working on: Font size control by users
 
+
+## [0.2.8] - 2025-05-12
+
+### Added
+- Proper instructions to setup Meritum for Teacher and Student
+
+### Changed
+- README.md updated
+- CHANGELOG.md updated
+
+### Fixed
+- Required version of python to 2.7
+
+
 ## [0.2.7] - 2025-05-10
 
 ### Added
