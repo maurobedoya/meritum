@@ -34,9 +34,15 @@ jobs:
 
     - name: Publish package to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+    
+    # Extract changelog and create GitHub Release
+    - name: Extract release notes
+      id: extract-release-notes
+      uses: ffurrer2/extract-release-notes@v2
 
     # Create GitHub release
     - name: Create release
       uses: softprops/action-gh-release@v1
       with:
+        body: ${{ steps.extract-release-notes.outputs.release_notes }}
         generate_release_notes: true
