@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="meritum",
-    version="0.2.7",
+    version="0.2.8",
     author="Mauricio Bedoya",
     author_email=None,
     description="A tool for tracking student progress using Gantt charts and task management",
@@ -24,7 +24,7 @@ setup(
         "Intended Audience :: Education",
         "Topic :: Office/Business :: Scheduling",
     ],
-    python_requires=">=3.12.7",
+    python_requires=">=3.7",
     install_requires=[
         "customtkinter>=5.2.2",
     ],
