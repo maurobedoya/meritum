@@ -15,7 +15,6 @@ APP_VERSION = "0.2.8"
 # Patch CustomTkinter to better handle animation cancellation
 original_ctk_destroy = ctk.CTkBaseClass.destroy
 
-
 def patched_destroy(self):
     """Patched destroy method to cancel animations before destroying"""
     try:
@@ -73,14 +72,40 @@ COLOR_SCHEME = {
     'milestone': '#ffc107',     # Yellow for milestones
 }
 
+def get_config_dir():
+    """Get the appropriate configuration directory for the current platform."""
+    home = Path.home()
+    
+    if platform.system() == "Windows":
+        # Windows: typically uses %APPDATA%\Meritum
+        return home / "AppData" / "Roaming" / "Meritum"
+    elif platform.system() == "Darwin":
+        # macOS: typically uses ~/Library/Application Support/Meritum
+        return home / "Library" / "Application Support" / "Meritum"
+    else:
+        # Linux/Unix: typically uses ~/.config/meritum (XDG Base Directory spec)
+        xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
+        if xdg_config_home:
+            return Path(xdg_config_home) / "meritum"
+        else:
+            return home / ".config" / "meritum"
+
+def get_config_file_path(filename):
+    """Get the full path for a configuration file."""
+    config_dir = get_config_dir()
+    # Create the directory if it doesn't exist
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir / filename
+
 class ConfigManager:
     def __init__(self):
-        self.config_file = os.path.join(os.path.expanduser("~"), ".meritum_config.json")
+        self.config_file = get_config_file_path(".meritum_config.json")
+        self.students_config_file = get_config_file_path("students_config.json")
         self.config = self.load_config()
     
     def load_config(self):
         """Load configuration from file or create default if it doesn't exist"""
-        if os.path.exists(self.config_file):
+        if self.config_file.exists():
             try:
                 with open(self.config_file, 'r') as f:
                     return json.load(f)
@@ -95,14 +120,22 @@ class ConfigManager:
         return {
             "app_mode": None,  # None, "teacher", or "student"
             "last_student_path": None,  # Path for student mode
+            "last_student_name": None,  # Last used student name
             "teacher_data": {
                 "student_paths": {}  # Dictionary of student names and paths
+            },
+            "gantt_config": {
+                "start_date": None,
+                "end_date": None,
+                "zoom_factor": 1.0,
+                "view_mode": "Month"
             }
         }
     
     def save_config(self):
         """Save configuration to file"""
         try:
+            self.config_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=2)
             return True
@@ -141,9 +174,21 @@ class ConfigManager:
         """Update teacher's students data"""
         self.config["teacher_data"]["student_paths"] = students_dict
         self.save_config()
+        
     
     def get_teacher_data(self):
         """Get teacher's students data"""
+        if self.students_config_file.exists():
+            try:
+                with open(self.students_config_file, 'r') as f:
+                    students_data = json.load(f)
+                    # Update the main config with this data too
+                    self.config["teacher_data"]["student_paths"] = students_data
+                    return students_data
+            except Exception as e:
+                print(f"Error loading students config: {e}")
+        
+        # Fallback to data in main config file
         return self.config["teacher_data"]["student_paths"]
 
     def get_gantt_config(self):
@@ -1638,44 +1683,51 @@ class StudentProgressApp(ctk.CTk):
     
     def load_students_config(self):
         # Load students configuration from config file
-        config_path = Path("students_config.json")
-
-        print(f"Loading student config from: {config_path.absolute()}")
+            # Load students configuration from config file
+        print(f"Loading student config from: {self.config_manager.students_config_file}")
 
         if self.app_mode == "student" and hasattr(self, 'student_data_path'):
             student_config_path = Path(os.path.join(self.student_data_path, "student_config.json"))
             if student_config_path.exists():
                 config_path = student_config_path
                 print(f"Using student-specific config: {config_path}")
+                try:
+                    with open(config_path, 'r') as f:
+                        data = json.load(f)
+                        print(f"Loaded student data: {data}")
+                        self.students = data
+                        if not self.students:
+                            print("Warning: Student config exists but contains no students")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to load student configuration: {str(e)}")
+                    print(f"Error loading student configuration: {str(e)}")
+                return
 
-        if config_path.exists():
-            try:
-                with open(config_path, 'r') as f:
-                    data = json.load(f)
-                    print(f"Loaded student data: {data}")
-                    self.students = data
-
-                    if not self.students:
-                        print("Warning: Student config exists but contains no students")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to load student configuration: {str(e)}")
-                print(f"Error loading student configuration: {str(e)}")
-        else:
-            print(f"No config file found at {config_path}, creating empty config")
-            # Create empty config file
+        # For teacher mode, load from central configuration
+        try:
+            self.students = self.config_manager.get_teacher_data()
+            if not self.students:
+                print("No students found in config, creating empty config")
+                self.students = {}
+                self.save_students_config()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load student configuration: {str(e)}")
+            print(f"Error loading student configuration: {str(e)}")
+            self.students = {}
             self.save_students_config()
     
     def save_students_config(self):
-        # Save students configuration to config file
-        config_path = Path("students_config.json")
+        """Save students configuration to config file"""
         try:
-            with open(config_path, 'w') as f:
-                json.dump(self.students, f, indent=2)
+            # Update the student paths in the config manager
+            self.config_manager.update_teacher_data(self.students)
+            
+            # Print success message for debugging
+            print(f"Successfully saved student configuration to: {self.config_manager.students_config_file}")
+            
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save student configuration: {str(e)}")
-            
-        if hasattr(self, 'config_manager'):
-            self.config_manager.update_teacher_data(self.students)
+            print(f"Error saving student configuration: {str(e)}")
 
 class StudentSettingsFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
