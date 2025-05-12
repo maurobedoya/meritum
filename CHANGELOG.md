@@ -41,4 +41,5 @@ All notable changes to Meritum will be documented in this file.
 
 
 [Unreleased]: https://github.com/maurobedoya/meritum/compare/v0.2.7...HEAD
+[0.2.8]: https://github.com/maurobedoya/meritum/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/maurobedoya/meritum/releases/v0.2.7
