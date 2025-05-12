@@ -55,22 +55,59 @@ meritum
 On first run, you'll be prompted to choose either Teacher or Student mode.
 [<img align="right" src="https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_select_mode.png" width="300" />](https://raw.githubusercontent.com/maurobedoya/meritum/main/meritum/assets/meritum_select_mode.png)
 
-### Teacher Mode
 
-Teachers can:
-- Manage multiple student profiles
-- Create goals and objectives for students
-- Create and assign tasks linked to specific goals
-- Track progress across different students
-- Add notes and feedback to student work
+# Setup guide
+## For Teachers
 
-### Student Mode
+### 1. Initial setup
+- Launch Meritum and select "Teacher Mode"
+- Go to Settings to configure application defaults if needed
+  
+### 2. Add students
+- Click "Add Student" in the sidebar
+- Enter the student´s name and create a data folder path
+- This data folder should be in a location that can be shared (Dropbox, Google Drive, OneDrive, etc.)
+- Fill the student´s profile information
 
-Students can:
-- View their assigned tasks
-- Update task progress
-- Add notes to tasks
-- View their project timeline through Gantt charts
+### 3. Share Data Folder
+- Share the data folder with your student using your preferred file-sharing service
+
+### 4. Create Goals and Tasks
+- Set up initial goals for the student from the Goals tab
+- Create tasks and milestones from the Tasks tab or Gantt Chart
+- Assign tasks to either yourself or the student
+
+### 5. Monitor Progress
+- Use the Gantt Chart to get a visual overview of the project timeline
+- Regular check-ins through the Notes feature can provide qualitative feedback
+
+## For Students:
+
+### 1. Initial Setup
+
+- Launch Meritum and select "Student Mode"
+- When prompted, enter the data folder path shared by your teacher
+- If an existing profile exists, select it; otherwise, create a new profile
+
+### 2. Configure Data Path
+
+- Verify the data folder path in the Settings tab
+- Make sure it points to the synchronized folder on your computer. Note that your local path may be different from your teacher's path, but both should point to the same synchronized folder (via Dropbox, Google Drive, etc.)
+  
+### 3. View and Update Progress
+
+- View assigned tasks in the Tasks tab or Gantt Chart
+- Update your progress on tasks by editing them and adjusting the progress percentage
+- Mark tasks as complete when finished
+
+### 4. Add Notes
+
+- Use the Notes feature to provide context or ask questions about specific tasks
+- All notes will be synchronized with your teacher
+
+### Synchronization:
+
+All changes are automatically saved to the shared data folder. Both teacher and student see the same real-time data. There's no need for manual synchronization as long as both parties are using the same data folder. For cloud-based sharing services (Dropbox, Google Drive, etc.), ensure that syncing is enabled and up-to-date
 
 ## Adding students
 
