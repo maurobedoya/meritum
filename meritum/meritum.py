@@ -10,7 +10,7 @@ import platform
 import time
 import sys
 
-APP_VERSION = "0.2.8"
+APP_VERSION = "0.2.9"
 
 # Patch CustomTkinter to better handle animation cancellation
 original_ctk_destroy = ctk.CTkBaseClass.destroy

@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="meritum",
-    version="0.2.8",
+    version="0.2.9",
     author="Mauricio Bedoya",
     author_email=None,
     description="A tool for tracking student progress using Gantt charts and task management",
