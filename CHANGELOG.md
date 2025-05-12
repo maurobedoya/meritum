@@ -8,6 +8,19 @@ All notable changes to Meritum will be documented in this file.
 - Working on: Font size control by users
 
 
+## [0.2.9] - 2025-05-12
+
+### Added
+- A new way to store the configuration of the app in the system
+
+### Changed
+- CHANGELOG.md was updated
+- meritum.py main was updated
+
+### Fixed
+- A bug related with saving the configuration of the app in the system
+
+
 ## [0.2.8] - 2025-05-12
 
 ### Added
@@ -40,6 +53,7 @@ All notable changes to Meritum will be documented in this file.
 - Path selection issues in student mode
 
 
-[Unreleased]: https://github.com/maurobedoya/meritum/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/maurobedoya/meritum/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/maurobedoya/meritum/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/maurobedoya/meritum/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/maurobedoya/meritum/releases/v0.2.7
