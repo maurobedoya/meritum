@@ -40,9 +40,14 @@ jobs:
       id: extract-release-notes
       uses: ffurrer2/extract-release-notes@v2
 
-    # Create GitHub release
+    # Create GitHub release, also add the changelog
     - name: Create release
       uses: softprops/action-gh-release@v1
       with:
-        body: ${{ steps.extract-release-notes.outputs.release_notes }}
+        body: |
+          ## Changelog
+
+          ${{ steps.extract-release-notes.outputs.release_notes }}
+          
+          ---
         generate_release_notes: true
