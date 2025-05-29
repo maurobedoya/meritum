@@ -70,6 +70,15 @@ COLOR_SCHEME = {
     'task_late': '#dc3545',    # Red for late tasks
     'task_completed': '#28a745',  # Green for completed tasks of unassigned tasks to any objective.
     'milestone': '#ffc107',     # Yellow for milestones
+    # Subtask settings
+    'subtask_student_border': '#1f6aa5',     # Blue border for student subtasks
+    'subtask_teacher_border': '#28a745',     # Green border for teacher subtasks
+    'subtask_not_completed': '#000000',      # Black fill for not completed
+    'subtask_completed_fill': 'border_color', # Use border color for completed
+    'subtask_size': 8,                       # Default subtask circle size
+    'subtask_thickness': 2,                  # Default border thickness
+    'subtask_position_mode': 'online',  # 'outside', 'online', 'inside'
+    'subtask_spacing': 4,                # Spacing from task bar for 'outside' mode
 }
 
 def get_config_dir():
@@ -129,6 +138,15 @@ class ConfigManager:
                 "end_date": None,
                 "zoom_factor": 1.0,
                 "view_mode": "Month"
+            },
+            "subtasks_config": {
+                "size": 8,
+                "thickness": 2,
+                "student_border": "#1f6aa5",
+                "teacher_border": "#28a745",
+                "position_mode": "online",
+                "spacing": 4,
+                "not_completed": "#000000"
             }
         }
     
@@ -175,7 +193,6 @@ class ConfigManager:
         self.config["teacher_data"]["student_paths"] = students_dict
         self.save_config()
         
-    
     def get_teacher_data(self):
         """Get teacher's students data"""
         if self.students_config_file.exists():
@@ -220,6 +237,36 @@ class ConfigManager:
             self.config["gantt_config"]["zoom_factor"] = zoom_factor
         if view_mode is not None:
             self.config["gantt_config"]["view_mode"] = view_mode
+
+        self.save_config()
+
+    def get_subtasks_config(self):
+        """Get saved subtasks configuration"""
+        subtasks_config = self.config.get("subtasks_config", {})
+        if not subtasks_config:
+            # Default values
+            subtasks_config = {
+                "size": 8,
+                "thickness": 2,
+                "student_border": "#1f6aa5",
+                "teacher_border": "#28a745",
+                "position_mode": "online",
+                "spacing": 4,
+                "not_completed": "#000000"
+            }
+            self.config["subtasks_config"] = subtasks_config
+            self.save_config()
+        return subtasks_config
+
+    def set_subtasks_config(self, **kwargs):
+        """Save subtasks configuration"""
+        if "subtasks_config" not in self.config:
+            self.config["subtasks_config"] = {}
+
+        # Update provided values
+        for key, value in kwargs.items():
+            if value is not None:
+                self.config["subtasks_config"][key] = value
 
         self.save_config()
 
@@ -1143,7 +1190,19 @@ class StudentProgressApp(ctk.CTk):
             if self.app_mode == "student":
                 self.student_name = self.config_manager.get_student_name()
                 self.student_data_path = self.config_manager.get_student_path()
-            
+
+        # Load subtasks configuration and apply to COLOR_SCHEME
+        if self.config_manager:
+            subtasks_config = self.config_manager.get_subtasks_config()
+            if subtasks_config:
+                COLOR_SCHEME['subtask_size'] = subtasks_config.get("size", 8)
+                COLOR_SCHEME['subtask_thickness'] = subtasks_config.get("thickness", 2)
+                COLOR_SCHEME['subtask_student_border'] = subtasks_config.get("student_border", "#1f6aa5")
+                COLOR_SCHEME['subtask_teacher_border'] = subtasks_config.get("teacher_border", "#28a745")
+                COLOR_SCHEME['subtask_position_mode'] = subtasks_config.get("position_mode", "online")
+                COLOR_SCHEME['subtask_spacing'] = subtasks_config.get("spacing", 4)
+                COLOR_SCHEME['subtask_not_completed'] = subtasks_config.get("not_completed", "#000000")
+
         # If still no mode, show selection dialog
         if not self.app_mode:
             self.select_mode()
@@ -1412,6 +1471,17 @@ class StudentProgressApp(ctk.CTk):
         )
         self.tasks_btn.pack(pady=10)
 
+        self.subtasks_btn = ctk.CTkButton(
+            self.sidebar,
+            text="Subtasks",
+            command=self.show_subtasks_frame,
+            width=150,
+            height=40,
+            fg_color=self.BUTTON_COLORS['inactive'],
+            hover_color=self.BUTTON_COLORS['hover_inactive']
+        )
+        self.subtasks_btn.pack(pady=10)
+
         self.notes_btn = ctk.CTkButton(
             self.sidebar,
             text="Notes",
@@ -1478,12 +1548,13 @@ class StudentProgressApp(ctk.CTk):
     def update_button_colors(self, active_button):
         """Update button colors based on which view is active"""
         # Reset all buttons to inactive
-        buttons = ['profile', 'goals', 'gantt', 'tasks', 'notes']
+        buttons = ['profile', 'goals', 'gantt', 'tasks', 'subtasks', 'notes']
         button_widgets = {
             'profile': self.profile_btn,
             'goals': self.goals_btn,
             'gantt': self.gantt_btn,
             'tasks': self.tasks_btn,
+            'subtasks': self.subtasks_btn,
             'notes': self.notes_btn,
         }
 
@@ -1537,6 +1608,21 @@ class StudentProgressApp(ctk.CTk):
         if self.current_student and self.current_student != "Add a student...":
             self.current_frame.load_student_data()
     
+    def show_subtasks_frame(self):
+        # Clear main content
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Create subtasks frame
+        self.current_frame = SubtasksFrame(self.main_content, self)
+        self.current_frame.pack(fill='both', expand=True)
+
+        # Update button colors
+        self.update_button_colors("subtasks")
+
+        if self.current_student and self.current_student != "Add a student...":
+            self.current_frame.load_student_data()    
+
     def show_notes_frame(self):
         # Clear main content
         for widget in self.main_content.winfo_children():
@@ -3674,6 +3760,15 @@ class GanttChartFrame(ctk.CTkFrame):
             width=120
         )
         self.add_task_btn.pack(side='right', padx=5)
+
+        self.add_subtask_btn = ctk.CTkButton(
+            self.action_frame,
+            text="Add Subtask",
+            command=self.add_subtask_to_selected_task,
+            width=100,
+            state="disabled"
+        )
+        self.add_subtask_btn.pack(side='left', padx=5)
         
         # Initialize empty chart
         self.update_chart()
@@ -3947,7 +4042,7 @@ class GanttChartFrame(ctk.CTkFrame):
             )
     
     def draw_tasks(self, start_date, end_date, chart_width, filtered_tasks=None, day_width=30):
-        """Draw tasks on the Gantt chart with custom day width"""
+        """Draw tasks on the Gantt chart with custom day width and subtasks"""
         # Use filtered tasks if provided, otherwise use all tasks
         tasks_to_draw = filtered_tasks if filtered_tasks is not None else self.tasks
 
@@ -3975,6 +4070,9 @@ class GanttChartFrame(ctk.CTkFrame):
         # Sort tasks by start date
         sorted_tasks = sorted(tasks_to_draw, key=lambda t: datetime.strptime(t['start_date'], "%Y-%m-%d"))
 
+        # Load subtasks data
+        subtasks = self.load_subtasks_data()
+
         # Draw each task
         for idx, task in enumerate(sorted_tasks):
             try:
@@ -4001,7 +4099,7 @@ class GanttChartFrame(ctk.CTkFrame):
                 x2 = x1 + (task_days * day_width)
                 y2 = y1 + task_height
 
-                # Determine if milestone
+                # Determine task properties
                 is_milestone = task.get('is_milestone', False)
                 is_completed = task.get('completed', False)
                 is_late = task_end < datetime.now() and not is_completed
@@ -4009,44 +4107,37 @@ class GanttChartFrame(ctk.CTkFrame):
                 # Determine color based on status and goal
                 if task.get('goal_color'):
                     base_color = task.get('goal_color')
-
-                    # Adjust color based on status
                     if is_completed:
-                        color = self.adjust_color_opacity(base_color, 1.2)  # Use full color for completed tasks
+                        color = self.adjust_color_opacity(base_color, 1.2)
                     elif is_late:
-                        color = COLOR_SCHEME['task_late']  # Red for overdue tasks regardless of goal
+                        color = COLOR_SCHEME['task_late']
                     elif is_milestone:
-                        color = COLOR_SCHEME['milestone']  # Yellow for milestones
+                        color = COLOR_SCHEME['milestone']
                     else:
-                        # For in-progress tasks, adjust the color based on progress
                         progress = task.get('progress', 0)
                         if progress < 25:
-                            # Very light version of the color for low progress
                             color = self.adjust_color_opacity(base_color, 0.3)
                         elif progress < 50:
-                            # Slightly stronger but still light
                             color = self.adjust_color_opacity(base_color, 0.5)
                         elif progress < 75:
-                            # Medium strength
                             color = self.adjust_color_opacity(base_color, 0.7)
                         else:
-                            # Almost full strength for high progress
                             color = self.adjust_color_opacity(base_color, 0.9)
                 else:
-                    # Fallback to default colors if no goal color is specified
+                    # Fallback to default colors
                     if is_milestone:
                         if is_completed:
-                            color = COLOR_SCHEME['task_completed']  # Green for completed milestones
+                            color = COLOR_SCHEME['task_completed']
                         elif is_late:
-                            color = COLOR_SCHEME['task_late']  # Red for late milestones
+                            color = COLOR_SCHEME['task_late']
                         else:
-                            color = COLOR_SCHEME['milestone']  # Yellow for normal milestones
+                            color = COLOR_SCHEME['milestone']
                     elif is_completed:
-                        color = COLOR_SCHEME['task_completed']  # Green for completed tasks
+                        color = COLOR_SCHEME['task_completed']
                     elif is_late:
-                        color = COLOR_SCHEME['task_late']  # Red for overdue tasks
+                        color = COLOR_SCHEME['task_late']
                     else:
-                        color = COLOR_SCHEME['task_normal']  # Blue for normal tasks
+                        color = COLOR_SCHEME['task_normal']
 
                 # Draw task shape
                 if is_milestone:
@@ -4064,13 +4155,11 @@ class GanttChartFrame(ctk.CTkFrame):
                         progress = task.get('progress', 0)
                         progress_width = (task_days * day_width) * (progress / 100)
 
-                        if progress_width > 2:  # Only draw if there's enough space
-                            # Use a darker version of the task color for progress bar
-                            progress_color = "#81c784"  # Default green progress
-
+                        if progress_width > 2:
+                            progress_color = "#81c784"
                             if task.get('goal_color'):
                                 base_color = task.get('goal_color')
-                                progress_color = self.adjust_color_opacity(base_color, 1.2)  # Slightly darker
+                                progress_color = self.adjust_color_opacity(base_color, 1.2)
 
                             self.gantt_canvas.create_rectangle(
                                 x1, y1, x1 + progress_width, y2,
@@ -4080,10 +4169,13 @@ class GanttChartFrame(ctk.CTkFrame):
                 # Store rectangle id and task data for click events
                 self.task_rectangles.append((rect_id, task))
 
+                # Draw subtasks
+                self.draw_subtasks_for_task(task, x1, x2, y1, y2, subtasks)
+
                 # Draw task name
                 text_x = x1 + 5
                 if is_milestone:
-                    text_x = mid_x + 20  # Adjust text position for milestone
+                    text_x = (x1 + x2) / 2 + 20
 
                 self.gantt_canvas.create_text(
                     text_x, 
@@ -4096,7 +4188,168 @@ class GanttChartFrame(ctk.CTkFrame):
 
             except Exception as e:
                 print(f"Error drawing task {task['title']}: {str(e)}")
-                
+
+    def draw_subtasks_for_task(self, task, x1, x2, y1, y2, subtasks):
+        """Draw subtasks as circles on the task bar with configurable positioning"""
+        task_id = task.get('id', '')
+        task_subtasks = [s for s in subtasks if s.get('task_id', '') == task_id]
+
+        if not task_subtasks:
+            return
+
+        # Get subtask display settings
+        subtask_size = COLOR_SCHEME.get('subtask_size', 8)
+        subtask_thickness = COLOR_SCHEME.get('subtask_thickness', 2)
+        position_mode = COLOR_SCHEME.get('subtask_position_mode', 'outside')
+        spacing = COLOR_SCHEME.get('subtask_spacing', 4)
+
+        # Separate subtasks by assignee
+        student_subtasks = [s for s in task_subtasks if s.get('assignee', '') == 'Student']
+        teacher_subtasks = [s for s in task_subtasks if s.get('assignee', '') == 'Teacher']
+
+        # Calculate positions based on mode
+        if position_mode == "outside":
+            # Above and below task bar
+            student_y = y1 - spacing - subtask_size//2
+            teacher_y = y2 + spacing + subtask_size//2
+
+        elif position_mode == "online":
+            # On the edges of task bar
+            student_y = y1  # Top edge
+            teacher_y = y2  # Bottom edge
+
+        elif position_mode == "inside":
+            # Inside the task bar
+            task_height = y2 - y1
+            student_y = y1 + task_height * 0.33  # Upper third
+            teacher_y = y1 + task_height * 0.67  # Lower third
+
+        # Draw student subtasks
+        if student_subtasks:
+            self.draw_subtask_row(
+                student_subtasks, 
+                x1, x2, student_y,
+                COLOR_SCHEME.get('subtask_student_border', '#1f6aa5'),
+                subtask_size, subtask_thickness
+            )
+
+        # Draw teacher subtasks
+        if teacher_subtasks:
+            self.draw_subtask_row(
+                teacher_subtasks, 
+                x1, x2, teacher_y,
+                COLOR_SCHEME.get('subtask_teacher_border', '#28a745'),
+                subtask_size, subtask_thickness
+            )
+
+    def draw_subtask_row(self, subtasks, x1, x2, y_center, border_color, size, thickness):
+        """Draw a row of subtasks"""
+        task_width = x2 - x1
+        num_subtasks = len(subtasks)
+
+        if num_subtasks == 0:
+            return
+
+        # Calculate spacing
+        if num_subtasks == 1:
+            positions = [x1 + task_width / 2]
+        else:
+            spacing = task_width / (num_subtasks + 1)
+            positions = [x1 + spacing * (i + 1) for i in range(num_subtasks)]
+
+        # Draw each subtask
+        for i, subtask in enumerate(subtasks):
+            if i >= len(positions):
+                break
+
+            x_center = positions[i]
+            completed = subtask.get('completed', False)
+
+            # Determine fill color
+            if completed:
+                fill_color = border_color
+            else:
+                fill_color = COLOR_SCHEME.get('subtask_not_completed', '#000000')
+
+            # Draw circle
+            self.gantt_canvas.create_oval(
+                x_center - size//2, y_center - size//2,
+                x_center + size//2, y_center + size//2,
+                fill=fill_color,
+                outline=border_color,
+                width=thickness,
+                tags=("subtask",)
+            )
+
+    def load_subtasks_data(self):
+        """Load subtasks data from file"""
+        try:
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return []
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return []
+
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                return data.get("subtasks", [])
+        except Exception as e:
+            print(f"Error loading subtasks: {str(e)}")
+            return []
+
+    def add_subtask_to_selected_task(self):
+        """Add subtask to the currently selected task"""
+        if not self.selected_task:
+            messagebox.showinfo("No Task Selected", "Please select a task first by clicking on it in the Gantt chart.")
+            return
+
+        dialog = SubtaskDialog(self, self.selected_task)
+        self.wait_window(dialog)
+
+        if dialog.subtask_data:
+            # Add task_id to subtask data
+            dialog.subtask_data['task_id'] = self.selected_task.get('id', '')
+
+            # Save subtask to file
+            try:
+                student_data = self.app.students.get(self.app.current_student, {})
+                data_path = student_data.get("data_path", "")
+
+                if not data_path:
+                    return
+
+                data_file = os.path.join(data_path, "progress_data.json")
+
+                # Load existing data
+                if os.path.exists(data_file):
+                    with open(data_file, 'r') as f:
+                        data = json.load(f)
+                else:
+                    data = {"tasks": [], "notes": [], "goals": []}
+
+                # Add subtasks array if it doesn't exist
+                if "subtasks" not in data:
+                    data["subtasks"] = []
+
+                # Add new subtask
+                data["subtasks"].append(dialog.subtask_data)
+
+                # Save updated data
+                with open(data_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+
+                # Refresh the Gantt chart to show new subtask
+                self.update_chart()
+
+                messagebox.showinfo("Success", "Subtask added successfully")
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save subtask: {str(e)}") 
+
     def on_goal_change(self, value):
             """Handle goal filter change in the GanttChartFrame
 
@@ -4398,6 +4651,8 @@ class GanttChartFrame(ctk.CTkFrame):
                 completion_date = datetime.strptime(self.selected_task['completion_date'], "%Y-%m-%d").strftime("%d %b %Y")
                 completed_by = self.selected_task.get('completed_by', 'Unknown')
                 date_text += f" | Completed: {completion_date} by {completed_by}"
+                # Enable subtask button
+                self.add_subtask_btn.configure(state="normal")
 
             self.date_info.configure(text=date_text)
 
@@ -4442,6 +4697,7 @@ class GanttChartFrame(ctk.CTkFrame):
             self.complete_btn.configure(state="disabled")
             self.not_complete_btn.configure(state="disabled")
             self.add_note_btn.configure(state="disabled")
+            self.add_subtask_btn.configure(state="disabled")
     
     def on_canvas_configure(self, event):
         """Handle canvas resize"""
@@ -4829,6 +5085,8 @@ class TaskDialog(ctk.CTkToplevel):
         
         self.desc_text = ctk.CTkTextbox(self.main_frame, height=100)
         self.desc_text.pack(fill='x', pady=(0, 10))
+
+        self.setup_subtasks_section()
         
         # Is milestone checkbox
         self.milestone_var = tk.BooleanVar(value=False)
@@ -5026,6 +5284,237 @@ class TaskDialog(ctk.CTkToplevel):
         # Close this dialog and refresh task list
         self.destroy()
         self.parent.apply_filter(self.parent.filter_var.get())
+
+    def setup_subtasks_section(self):
+        """Setup subtasks section in task dialog"""
+        # Subtasks section
+        self.subtasks_section_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Subtasks Management:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        self.subtasks_section_label.pack(anchor='w', pady=(15, 5))
+
+        # Subtasks buttons frame
+        subtasks_buttons_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        subtasks_buttons_frame.pack(fill='x', pady=(0, 10))
+
+        self.add_subtask_btn = ctk.CTkButton(
+            subtasks_buttons_frame,
+            text="Add Subtask",
+            command=self.add_subtask_from_task_dialog,
+            width=120,
+            height=30
+        )
+        self.add_subtask_btn.pack(side='left', padx=5)
+
+        self.manage_subtasks_btn = ctk.CTkButton(
+            subtasks_buttons_frame,
+            text="Manage Subtasks",
+            command=self.manage_subtasks_from_task_dialog,
+            width=140,
+            height=30
+        )
+        self.manage_subtasks_btn.pack(side='left', padx=5)
+
+        # Subtasks count display
+        self.subtasks_count_label = ctk.CTkLabel(
+            subtasks_buttons_frame,
+            text="",
+            font=ctk.CTkFont(size=11),
+            text_color="#B0B0B0"
+        )
+        self.subtasks_count_label.pack(side='right', padx=10)
+
+        # Update subtasks count
+        self.update_subtasks_count()
+
+    def add_subtask_from_task_dialog(self):
+        """Add subtask from task edit dialog"""
+        # For new tasks, we need to save the task first
+        if not self.existing_task:
+            # Show message that task needs to be saved first
+            response = messagebox.askyesno(
+                "Save Task First", 
+                "The task must be saved before adding subtasks. Would you like to save it now?"
+            )
+            if response:
+                # Validate and save task first
+                if self.validate_and_prepare_task_data():
+                    # Add to parent's task list temporarily
+                    self.parent.tasks.append(self.task_data)
+                    self.parent.save_student_data()
+
+                    # Now create subtask dialog
+                    dialog = SubtaskDialog(self.parent, self.task_data)
+                    self.wait_window(dialog)
+
+                    if dialog.subtask_data:
+                        self.save_subtask_to_file(dialog.subtask_data, self.task_data.get('id', ''))
+                        self.update_subtasks_count()
+                else:
+                    return
+            else:
+                return
+        else:
+            # For existing tasks, directly create subtask
+            dialog = SubtaskDialog(self.parent, self.existing_task)
+            self.wait_window(dialog)
+
+            if dialog.subtask_data:
+                self.save_subtask_to_file(dialog.subtask_data, self.existing_task.get('id', ''))
+                self.update_subtasks_count()
+
+    def manage_subtasks_from_task_dialog(self):
+        """Open subtasks management for this task"""
+        task_to_use = self.existing_task if self.existing_task else self.task_data
+
+        if not task_to_use:
+            messagebox.showinfo("Info", "Please save the task first before managing subtasks.")
+            return
+
+        # Create a mini subtasks manager dialog
+        dialog = TaskSubtasksManagerDialog(self, task_to_use)
+        self.wait_window(dialog)
+
+        # Update subtasks count after dialog closes
+        self.update_subtasks_count()
+
+    def validate_and_prepare_task_data(self):
+        """Validate and prepare task data - extracted from save_task method"""
+        # Validate fields
+        title = self.title_entry.get().strip()
+        if not title:
+            messagebox.showerror("Error", "Please enter a task title")
+            return False
+
+        start_date = self.start_entry.get().strip()
+        end_date = self.end_entry.get().strip()
+
+        # Validate dates
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+
+            if end < start:
+                messagebox.showerror("Error", "End date must be after start date")
+                return False
+
+        except ValueError:
+            messagebox.showerror("Error", "Invalid date format. Use YYYY-MM-DD")
+            return False
+
+        # Prepare task data
+        progress = self.progress_var.get()
+        current_user = "Teacher" if self.parent.app.app_mode == "teacher" else "Student"
+
+        # Get selected goal
+        goal_id = ""
+        goal_color = ""
+        goal_title = self.goal_var.get()
+
+        if goal_title != "None":
+            for goal in self.goals:
+                if goal.get('title', '') == goal_title:
+                    goal_id = goal.get('id', '')
+                    goal_color = goal.get('color', '')
+                    break
+
+        # Create task data
+        self.task_data = {
+            'id': str(int(time.time())),
+            'title': title,
+            'start_date': start_date,
+            'end_date': end_date,
+            'progress': progress,
+            'assignee': self.assignee_var.get(),
+            'description': self.desc_text.get('1.0', 'end-1c'),
+            'is_milestone': self.milestone_var.get(),
+            'completed': False,
+            'created_date': datetime.now().strftime("%Y-%m-%d"),
+            'last_modified': datetime.now().strftime("%Y-%m-%d"),
+            'last_modified_by': current_user,
+            'progress_history': [],
+            'goal_id': goal_id,
+            'goal_color': goal_color,
+        }
+
+        return True
+
+    def save_subtask_to_file(self, subtask_data, task_id):
+        """Save subtask to data file"""
+        try:
+            subtask_data['task_id'] = task_id
+
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+
+            # Load existing data
+            if os.path.exists(data_file):
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                data = {"tasks": [], "notes": [], "goals": []}
+
+            # Add subtasks array if it doesn't exist
+            if "subtasks" not in data:
+                data["subtasks"] = []
+
+            # Add new subtask
+            data["subtasks"].append(subtask_data)
+
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+            messagebox.showinfo("Success", "Subtask added successfully")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
+
+    def update_subtasks_count(self):
+        """Update the subtasks count display"""
+        try:
+            task_to_use = self.existing_task if self.existing_task else self.task_data
+
+            if not task_to_use:
+                self.subtasks_count_label.configure(text="")
+                return
+
+            # Load subtasks for this task
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                self.subtasks_count_label.configure(text="")
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                self.subtasks_count_label.configure(text="")
+                return
+
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                subtasks = data.get("subtasks", [])
+
+            # Count subtasks for this task
+            task_subtasks = [s for s in subtasks if s.get('task_id', '') == task_to_use.get('id', '')]
+            total_count = len(task_subtasks)
+            completed_count = len([s for s in task_subtasks if s.get('completed', False)])
+
+            if total_count > 0:
+                self.subtasks_count_label.configure(text=f"Subtasks: {completed_count}/{total_count}")
+            else:
+                self.subtasks_count_label.configure(text="No subtasks")
+
+        except Exception as e:
+            self.subtasks_count_label.configure(text="Error loading count")
 
 class NoteDialog(ctk.CTkToplevel):
     def __init__(self, parent, task):
@@ -6128,7 +6617,9 @@ class TaskViewDialog(ctk.CTkToplevel):
         self.notes_frame.pack(fill='x', pady=(0, 10))
     
         self.load_task_notes()
-    
+        # Create subtasks section
+        self.create_subtasks_section()
+
         # Buttons
         self.button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.button_frame.pack(fill='x', pady=(10, 0))
@@ -6230,6 +6721,519 @@ class TaskViewDialog(ctk.CTkToplevel):
             )
             error_label.pack(pady=10)
     
+    def load_task_subtasks(self):
+        """Load subtasks for this task"""
+        try:
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return []
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return []
+
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                subtasks = data.get("subtasks", [])
+
+            # Filter subtasks for this task
+            task_subtasks = [s for s in subtasks if s.get('task_id', '') == self.task.get('id', '')]
+            return task_subtasks
+        except Exception as e:
+            print(f"Error loading subtasks: {str(e)}")
+            return []
+
+    def add_subtask(self):
+        """Add a subtask to this task"""
+        dialog = SubtaskDialog(self.parent, self.task)
+        self.wait_window(dialog)
+
+        if dialog.subtask_data:
+            # Add task_id to subtask data
+            dialog.subtask_data['task_id'] = self.task.get('id', '')
+
+            # Save subtask to file
+            try:
+                student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+                data_path = student_data.get("data_path", "")
+
+                if not data_path:
+                    return
+
+                data_file = os.path.join(data_path, "progress_data.json")
+
+                # Load existing data
+                if os.path.exists(data_file):
+                    with open(data_file, 'r') as f:
+                        data = json.load(f)
+                else:
+                    data = {"tasks": [], "notes": [], "goals": []}
+
+                # Add subtasks array if it doesn't exist
+                if "subtasks" not in data:
+                    data["subtasks"] = []
+
+                # Add new subtask
+                data["subtasks"].append(dialog.subtask_data)
+
+                # Save updated data
+                with open(data_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+
+                # Refresh subtasks display
+                self.refresh_subtasks_display()
+
+                messagebox.showinfo("Success", "Subtask added successfully")
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
+
+    def refresh_subtasks_display(self):
+        """Refresh the subtasks display in the task view dialog"""
+        # Check if subtasks section already exists, if not create it
+        if not hasattr(self, 'subtasks_section_created'):
+            self.create_subtasks_section()
+        else:
+            # Clear existing subtasks display
+            if hasattr(self, 'subtasks_content_frame'):
+                for widget in self.subtasks_content_frame.winfo_children():
+                    widget.destroy()
+
+            # Reload and display subtasks
+            self.load_and_display_subtasks()
+
+    def create_subtasks_section(self):
+        """Create the subtasks section"""
+
+        # Subtasks section title
+        self.subtasks_title_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Subtasks:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        self.subtasks_title_label.pack(anchor='w', pady=(15, 5))
+
+        # Subtasks container frame
+        self.subtasks_container = ctk.CTkFrame(self.main_frame)
+        self.subtasks_container.pack(fill='x', pady=(0, 10))
+
+        # Subtasks content frame (scrollable if many subtasks)
+        self.subtasks_content_frame = ctk.CTkScrollableFrame(
+            self.subtasks_container,
+            height=150  # Fixed height to prevent dialog from growing too large
+        )
+        self.subtasks_content_frame.pack(fill='both', expand=True, padx=10, pady=10)
+
+        # Add subtask management buttons
+        self.subtasks_buttons_frame = ctk.CTkFrame(self.subtasks_container, fg_color="transparent")
+        self.subtasks_buttons_frame.pack(fill='x', padx=10, pady=(0, 10))
+
+        self.add_subtask_btn = ctk.CTkButton(
+            self.subtasks_buttons_frame,
+            text="Add Subtask",
+            command=self.add_subtask,
+            width=100,
+            height=25
+        )
+        self.add_subtask_btn.pack(side='left', padx=5)
+
+        # Refresh button
+        self.refresh_subtasks_btn = ctk.CTkButton(
+            self.subtasks_buttons_frame,
+            text="Refresh",
+            command=self.refresh_subtasks_display,
+            width=80,
+            height=25
+        )
+        self.refresh_subtasks_btn.pack(side='left', padx=5)
+
+        # Mark as created
+        self.subtasks_section_created = True
+
+        # Load and display initial subtasks
+        self.load_and_display_subtasks()
+
+    def load_and_display_subtasks(self):
+        """Load subtasks data and display them"""
+        try:
+            # Load subtasks for this task
+            task_subtasks = self.load_task_subtasks()
+
+            if not task_subtasks:
+                # Show "no subtasks" message
+                no_subtasks_label = ctk.CTkLabel(
+                    self.subtasks_content_frame,
+                    text="No subtasks found. Click 'Add Subtask' to create one.",
+                    font=ctk.CTkFont(size=12),
+                    text_color="#888888"
+                )
+                no_subtasks_label.pack(pady=20)
+                return
+
+            # Sort subtasks by creation date (most recent first)
+            sorted_subtasks = sorted(
+                task_subtasks,
+                key=lambda s: datetime.strptime(s.get('created_date', '2000-01-01 00:00:00'), "%Y-%m-%d %H:%M:%S"),
+                reverse=True
+            )
+
+            # Create statistics summary
+            self.create_subtasks_summary(task_subtasks)
+
+            # Display each subtask
+            for subtask in sorted_subtasks:
+                self.create_subtask_display_item(subtask)
+
+        except Exception as e:
+            error_label = ctk.CTkLabel(
+                self.subtasks_content_frame,
+                text=f"Error loading subtasks: {str(e)}",
+                font=ctk.CTkFont(size=12),
+                text_color="#ff6b6b"
+            )
+            error_label.pack(pady=10)
+
+    def create_subtasks_summary(self, subtasks):
+        """Create a summary of subtasks statistics"""
+        total_subtasks = len(subtasks)
+        completed_subtasks = len([s for s in subtasks if s.get('completed', False)])
+        student_subtasks = len([s for s in subtasks if s.get('assignee', '') == 'Student'])
+        teacher_subtasks = len([s for s in subtasks if s.get('assignee', '') == 'Teacher'])
+
+        # Summary frame
+        summary_frame = ctk.CTkFrame(self.subtasks_content_frame, fg_color=COLOR_SCHEME['content_inside_bg'])
+        summary_frame.pack(fill='x', pady=(0, 10))
+
+        # Summary content
+        summary_content = ctk.CTkFrame(summary_frame, fg_color="transparent")
+        summary_content.pack(fill='x', padx=10, pady=8)
+
+        # Statistics text
+        completion_rate = (completed_subtasks / total_subtasks * 100) if total_subtasks > 0 else 0
+        summary_text = f"Total: {total_subtasks} | Completed: {completed_subtasks} ({completion_rate:.0f}%) | Student: {student_subtasks} | Teacher: {teacher_subtasks}"
+
+        summary_label = ctk.CTkLabel(
+            summary_content,
+            text=summary_text,
+            font=ctk.CTkFont(size=11, weight="bold")
+        )
+        summary_label.pack(anchor='w')
+
+        # Progress bar
+        if total_subtasks > 0:
+            progress_bar = ctk.CTkProgressBar(summary_content)
+            progress_bar.pack(fill='x', pady=(5, 0))
+            progress_bar.set(completion_rate / 100)
+
+    def create_subtask_display_item(self, subtask):
+        """Create a display item for a single subtask"""
+        # Main subtask frame
+        subtask_frame = ctk.CTkFrame(self.subtasks_content_frame)
+        subtask_frame.pack(fill='x', pady=2)
+
+        # Content frame
+        content_frame = ctk.CTkFrame(subtask_frame, fg_color="transparent")
+        content_frame.pack(fill='x', padx=8, pady=6)
+
+        # Header with status indicator and title
+        header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        header_frame.pack(fill='x')
+
+        # Status indicator
+        status_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        status_frame.pack(side='left', padx=(0, 8))
+
+        # Create small status circle
+        status_canvas = tk.Canvas(
+            status_frame,
+            width=16,
+            height=16,
+            bg=COLOR_SCHEME['content_bg'],
+            highlightthickness=0
+        )
+        status_canvas.pack()
+
+        # Determine colors based on assignee and completion
+        assignee = subtask.get('assignee', 'Student')
+        completed = subtask.get('completed', False)
+
+        if assignee == 'Student':
+            border_color = COLOR_SCHEME.get('subtask_student_border', '#1f6aa5')
+        else:
+            border_color = COLOR_SCHEME.get('subtask_teacher_border', '#28a745')
+
+        fill_color = border_color if completed else COLOR_SCHEME.get('subtask_not_completed', '#000000')
+
+        # Draw status circle
+        status_canvas.create_oval(
+            2, 2, 14, 14,
+            fill=fill_color,
+            outline=border_color,
+            width=2
+        )
+
+        # Title and info
+        info_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        info_frame.pack(side='left', fill='x', expand=True)
+
+        # Title
+        title_label = ctk.CTkLabel(
+            info_frame,
+            text=subtask.get('title', 'Untitled Subtask'),
+            font=ctk.CTkFont(size=12, weight="bold"),
+            anchor='w'
+        )
+        title_label.pack(anchor='w')
+
+        # Assignee and status info
+        status_text = f"Assigned to: {assignee}"
+        if completed:
+            status_text += " | Completed"
+            completion_date = subtask.get('completion_date', '')
+            if completion_date:
+                try:
+                    date_obj = datetime.strptime(completion_date, "%Y-%m-%d %H:%M:%S")
+                    formatted_date = date_obj.strftime("%d %b %Y")
+                    status_text += f" on {formatted_date}"
+                    completed_by = subtask.get('completed_by', '')
+                    if completed_by:
+                        status_text += f" by {completed_by}"
+                except ValueError:
+                    pass
+        else:
+            status_text += " | Pending"
+
+        status_label = ctk.CTkLabel(
+            info_frame,
+            text=status_text,
+            font=ctk.CTkFont(size=10),
+            text_color="#B0B0B0",
+            anchor='w'
+        )
+        status_label.pack(anchor='w')
+
+        # Creation date
+        created_date = subtask.get('created_date', '')
+        if created_date:
+            try:
+                date_obj = datetime.strptime(created_date, "%Y-%m-%d %H:%M:%S")
+                created_text = f"Created: {date_obj.strftime('%d %b %Y at %H:%M')}"
+                created_by = subtask.get('created_by', '')
+                if created_by:
+                    created_text += f" by {created_by}"
+
+                created_label = ctk.CTkLabel(
+                    info_frame,
+                    text=created_text,
+                    font=ctk.CTkFont(size=9),
+                    text_color="#808080",
+                    anchor='w'
+                )
+                created_label.pack(anchor='w')
+            except ValueError:
+                pass
+            
+        # Description if available
+        description = subtask.get('description', '').strip()
+        if description:
+            desc_label = ctk.CTkLabel(
+                content_frame,
+                text=f"Note: {description}",
+                font=ctk.CTkFont(size=10),
+                text_color="#D0D0D0",
+                anchor='w',
+                wraplength=400
+            )
+            desc_label.pack(anchor='w', pady=(3, 0))
+
+        # Action buttons for each subtask
+        buttons_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        buttons_frame.pack(fill='x', pady=(5, 0))
+
+        # Edit button
+        edit_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Edit",
+            command=lambda s=subtask: self.edit_subtask_from_view(s),
+            width=60,
+            height=20,
+            font=ctk.CTkFont(size=10)
+        )
+        edit_btn.pack(side='left', padx=(0, 5))
+
+        # Toggle completion button
+        if completed:
+            toggle_btn = ctk.CTkButton(
+                buttons_frame,
+                text="Mark Pending",
+                command=lambda s=subtask: self.toggle_subtask_completion(s, False),
+                width=90,
+                height=20,
+                font=ctk.CTkFont(size=10)
+            )
+        else:
+            toggle_btn = ctk.CTkButton(
+                buttons_frame,
+                text="Complete",
+                command=lambda s=subtask: self.toggle_subtask_completion(s, True),
+                width=70,
+                height=20,
+                font=ctk.CTkFont(size=10)
+            )
+        toggle_btn.pack(side='left', padx=(0, 5))
+
+        # Delete button
+        delete_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Delete",
+            command=lambda s=subtask: self.delete_subtask_from_view(s),
+            width=60,
+            height=20,
+            font=ctk.CTkFont(size=10),
+            fg_color="#dc3545",
+            hover_color="#c82333"
+        )
+        delete_btn.pack(side='right')
+
+    def edit_subtask_from_view(self, subtask):
+        """Edit subtask from the task view dialog"""
+        dialog = SubtaskDialog(self.parent, self.task, subtask)
+        self.wait_window(dialog)
+
+        if dialog.subtask_data:
+            # Update subtask in data file
+            try:
+                student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+                data_path = student_data.get("data_path", "")
+
+                if not data_path:
+                    return
+
+                data_file = os.path.join(data_path, "progress_data.json")
+
+                # Load existing data
+                if os.path.exists(data_file):
+                    with open(data_file, 'r') as f:
+                        data = json.load(f)
+                else:
+                    return
+
+                # Update subtask
+                subtasks = data.get("subtasks", [])
+                for i, s in enumerate(subtasks):
+                    if s.get('id', '') == subtask.get('id', ''):
+                        subtasks[i] = dialog.subtask_data
+                        break
+                    
+                data["subtasks"] = subtasks
+
+                # Save updated data
+                with open(data_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+
+                # Refresh display
+                self.refresh_subtasks_display()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
+
+    def toggle_subtask_completion(self, subtask, completed):
+        """Toggle subtask completion status from task view"""
+        try:
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+
+            # Load existing data
+            if os.path.exists(data_file):
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                return
+
+            # Update subtask
+            current_user = "Teacher" if self.parent.app.app_mode == "teacher" else "Student"
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            subtasks = data.get("subtasks", [])
+            for i, s in enumerate(subtasks):
+                if s.get('id', '') == subtask.get('id', ''):
+                    subtasks[i]['completed'] = completed
+                    subtasks[i]['last_modified'] = current_time
+                    subtasks[i]['last_modified_by'] = current_user
+
+                    if completed:
+                        subtasks[i]['completion_date'] = current_time
+                        subtasks[i]['completed_by'] = current_user
+                    else:
+                        # Remove completion info when marking as pending
+                        if 'completion_date' in subtasks[i]:
+                            del subtasks[i]['completion_date']
+                        if 'completed_by' in subtasks[i]:
+                            del subtasks[i]['completed_by']
+                    break
+                
+            data["subtasks"] = subtasks
+
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+            # Refresh display
+            self.refresh_subtasks_display()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
+
+    def delete_subtask_from_view(self, subtask):
+        """Delete subtask from task view"""
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete the subtask '{subtask.get('title', '')}'?"
+        )
+
+        if not confirm:
+            return
+
+        try:
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+
+            # Load existing data
+            if os.path.exists(data_file):
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                return
+
+            # Remove subtask
+            subtasks = data.get("subtasks", [])
+            subtasks = [s for s in subtasks if s.get('id', '') != subtask.get('id', '')]
+            data["subtasks"] = subtasks
+
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+            # Refresh display
+            self.refresh_subtasks_display()
+
+            messagebox.showinfo("Success", "Subtask deleted successfully")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete subtask: {str(e)}")
+
     def create_note_item(self, note):
         """Create a note item widget"""
         note_frame = ctk.CTkFrame(self.notes_frame)
@@ -6416,6 +7420,988 @@ class TaskViewDialog(ctk.CTkToplevel):
         # Close this dialog and refresh task list
         self.destroy()
         self.parent.apply_filter(self.parent.filter_var.get())
+
+class SubtasksSettingsDialog(ctk.CTkToplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.title("Subtasks Settings")
+        self.geometry("600x650")  # Increased height for new options
+        self.resizable(False, False)
+        
+        # Center dialog
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - 600) // 2
+        y = (self.winfo_screenheight() - 650) // 2
+        self.geometry(f"600x650+{x}+{y}")
+        
+        self.main_frame = ctk.CTkScrollableFrame(self)  # Make scrollable
+        self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Subtasks Display Settings",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        title_label.pack(pady=(0, 20))
+        
+        # POSITIONING SETTINGS SECTION
+        positioning_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Positioning Options:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        positioning_label.pack(anchor='w', pady=(10, 10))
+        
+        # Position mode selection
+        self.position_mode_var = tk.StringVar(value=COLOR_SCHEME.get('subtask_position_mode', 'online'))
+        
+        position_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        position_frame.pack(fill='x', pady=(0, 15))
+        
+        # Outside position (original behavior)
+        outside_radio = ctk.CTkRadioButton(
+            position_frame,
+            text="Outside task bars (above/below)",
+            variable=self.position_mode_var,
+            value="outside",
+            command=self.update_preview
+        )
+        outside_radio.pack(anchor='w', pady=2)
+        
+        # On line position
+        online_radio = ctk.CTkRadioButton(
+            position_frame,
+            text="On task bar line (top/bottom edge)",
+            variable=self.position_mode_var,
+            value="online",
+            command=self.update_preview
+        )
+        online_radio.pack(anchor='w', pady=2)
+        
+        # Inside position
+        inside_radio = ctk.CTkRadioButton(
+            position_frame,
+            text="Inside task bars",
+            variable=self.position_mode_var,
+            value="inside",
+            command=self.update_preview
+        )
+        inside_radio.pack(anchor='w', pady=2)
+        
+        # Spacing option (only for outside mode)
+        spacing_label = ctk.CTkLabel(self.main_frame, text="Spacing from task bar:")
+        spacing_label.pack(anchor='w', pady=(10, 5))
+        
+        self.spacing_var = tk.IntVar(value=COLOR_SCHEME.get('subtask_spacing', 4))
+        self.spacing_slider = ctk.CTkSlider(
+            self.main_frame,
+            from_=2,
+            to=15,
+            number_of_steps=13,
+            variable=self.spacing_var,
+            command=self.update_preview
+        )
+        self.spacing_slider.pack(fill='x', pady=(0, 5))
+        
+        self.spacing_value = ctk.CTkLabel(self.main_frame, text=f"{self.spacing_var.get()}px")
+        self.spacing_value.pack(pady=(0, 10))
+        
+        # SIZE AND APPEARANCE SETTINGS
+        appearance_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Size and Appearance:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        appearance_label.pack(anchor='w', pady=(20, 10))
+        
+        # Subtask size
+        size_label = ctk.CTkLabel(self.main_frame, text="Subtask Circle Size:")
+        size_label.pack(anchor='w', pady=(10, 5))
+        
+        self.size_var = tk.IntVar(value=COLOR_SCHEME['subtask_size'])
+        self.size_slider = ctk.CTkSlider(
+            self.main_frame,
+            from_=4,
+            to=16,
+            number_of_steps=12,
+            variable=self.size_var,
+            command=self.update_preview
+        )
+        self.size_slider.pack(fill='x', pady=(0, 5))
+        
+        self.size_value = ctk.CTkLabel(self.main_frame, text=f"{self.size_var.get()}px")
+        self.size_value.pack(pady=(0, 10))
+        
+        # Border thickness
+        thickness_label = ctk.CTkLabel(self.main_frame, text="Border Thickness:")
+        thickness_label.pack(anchor='w', pady=(10, 5))
+        
+        self.thickness_var = tk.IntVar(value=COLOR_SCHEME['subtask_thickness'])
+        self.thickness_slider = ctk.CTkSlider(
+            self.main_frame,
+            from_=1,
+            to=4,
+            number_of_steps=3,
+            variable=self.thickness_var,
+            command=self.update_preview
+        )
+        self.thickness_slider.pack(fill='x', pady=(0, 5))
+        
+        self.thickness_value = ctk.CTkLabel(self.main_frame, text=f"{self.thickness_var.get()}px")
+        self.thickness_value.pack(pady=(0, 10))
+        
+        # COLOR SETTINGS
+        colors_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Colors:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        colors_label.pack(anchor='w', pady=(20, 10))
+        
+        # Student color
+        student_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        student_frame.pack(fill='x', pady=5)
+        
+        student_label = ctk.CTkLabel(student_frame, text="Student Border:")
+        student_label.pack(side='left', padx=(0, 10))
+        
+        self.student_color = COLOR_SCHEME['subtask_student_border']
+        self.student_color_btn = ctk.CTkButton(
+            student_frame,
+            text="",
+            width=30,
+            height=30,
+            fg_color=self.student_color,
+            command=lambda: self.pick_color('student')
+        )
+        self.student_color_btn.pack(side='left')
+        
+        # Teacher color
+        teacher_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        teacher_frame.pack(fill='x', pady=5)
+        
+        teacher_label = ctk.CTkLabel(teacher_frame, text="Teacher Border:")
+        teacher_label.pack(side='left', padx=(0, 10))
+        
+        self.teacher_color = COLOR_SCHEME['subtask_teacher_border']
+        self.teacher_color_btn = ctk.CTkButton(
+            teacher_frame,
+            text="",
+            width=30,
+            height=30,
+            fg_color=self.teacher_color,
+            command=lambda: self.pick_color('teacher')
+        )
+        self.teacher_color_btn.pack(side='left')
+        
+        # PREVIEW SECTION
+        preview_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Preview:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        preview_label.pack(anchor='w', pady=(20, 10))
+        
+        self.preview_canvas = tk.Canvas(
+            self.main_frame,
+            width=600,
+            height=140, 
+            bg=COLOR_SCHEME['content_inside_bg']
+        )
+        self.preview_canvas.pack(pady=(0, 20))
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        button_frame.pack(fill='x')
+        
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self.destroy,
+            fg_color=COLOR_SCHEME['inactive'],
+            width=100
+        )
+        cancel_btn.pack(side='right', padx=(10, 0))
+        
+        save_btn = ctk.CTkButton(
+            button_frame,
+            text="Save",
+            command=self.save_settings,
+            width=100
+        )
+        save_btn.pack(side='right')
+        
+        # Initial preview
+        self.update_preview()
+    
+    def update_preview(self, value=None):
+        """Update the preview canvas"""
+        self.size_value.configure(text=f"{self.size_var.get()}px")
+        self.thickness_value.configure(text=f"{self.thickness_var.get()}px")
+        self.spacing_value.configure(text=f"{self.spacing_var.get()}px")
+        
+        # Clear canvas
+        self.preview_canvas.delete("all")
+        
+        # Get current settings
+        position_mode = self.position_mode_var.get()
+        size = self.size_var.get()
+        thickness = self.thickness_var.get()
+        spacing = self.spacing_var.get()
+        
+        # Draw sample task bar
+        task_y1, task_y2 = 70, 90
+        self.preview_canvas.create_rectangle(
+            80, task_y1, 530, task_y2,
+            fill=COLOR_SCHEME['task_normal'],
+            outline=""
+        )
+        
+        # Draw subtasks based on position mode
+        if position_mode == "outside":
+            # Above and below task bar
+            student_y = task_y1 - spacing - size//2 - 5
+            teacher_y = task_y2 + spacing + size//2 + 5
+            
+            # Student subtasks (above)
+            for i, (x, completed) in enumerate([(120, False), (180, True), (240, False), (300, True)]):
+                fill_color = self.student_color if completed else COLOR_SCHEME['subtask_not_completed']
+                self.preview_canvas.create_oval(
+                    x - size//2, student_y - size//2,
+                    x + size//2, student_y + size//2,
+                    fill=fill_color,
+                    outline=self.student_color,
+                    width=thickness
+                )
+            
+            # Teacher subtasks (below)
+            for i, (x, completed) in enumerate([(140, True), (200, False), (260, True), (320, False)]):
+                fill_color = self.teacher_color if completed else COLOR_SCHEME['subtask_not_completed']
+                self.preview_canvas.create_oval(
+                    x - size//2, teacher_y - size//2,
+                    x + size//2, teacher_y + size//2,
+                    fill=fill_color,
+                    outline=self.teacher_color,
+                    width=thickness
+                )
+            
+            # Labels
+            self.preview_canvas.create_text(50, student_y, text="Student", fill="#FFFFFF", anchor="e", font=("Arial", 9))
+            self.preview_canvas.create_text(50, teacher_y, text="Teacher", fill="#FFFFFF", anchor="e", font=("Arial", 9))
+            
+        elif position_mode == "online":
+            # On the top and bottom edges of task bar
+            student_y = task_y1
+            teacher_y = task_y2
+            
+            # Student subtasks (on top edge)
+            for i, (x, completed) in enumerate([(80, False), (130, True), (180, False), (230, True)]):
+                fill_color = self.student_color if completed else COLOR_SCHEME['subtask_not_completed']
+                self.preview_canvas.create_oval(
+                    x - size//2, student_y - size//2,
+                    x + size//2, student_y + size//2,
+                    fill=fill_color,
+                    outline=self.student_color,
+                    width=thickness
+                )
+            
+            # Teacher subtasks (on bottom edge)
+            for i, (x, completed) in enumerate([(100, True), (150, False), (200, True), (250, False)]):
+                fill_color = self.teacher_color if completed else COLOR_SCHEME['subtask_not_completed']
+                self.preview_canvas.create_oval(
+                    x - size//2, teacher_y - size//2,
+                    x + size//2, teacher_y + size//2,
+                    fill=fill_color,
+                    outline=self.teacher_color,
+                    width=thickness
+                )
+            
+            # Labels
+            self.preview_canvas.create_text(30, task_y1 - 10, text="Student", fill="#FFFFFF", anchor="e")
+            self.preview_canvas.create_text(30, task_y2 + 10, text="Teacher", fill="#FFFFFF", anchor="e")
+            
+        elif position_mode == "inside":
+            # Inside the task bar, in two rows
+            student_y = task_y1 + (task_y2 - task_y1) * 0.33  # Upper third
+            teacher_y = task_y1 + (task_y2 - task_y1) * 0.67  # Lower third
+            
+            # Student subtasks (upper row inside)
+            for i, (x, completed) in enumerate([(80, False), (130, True), (180, False), (230, True)]):
+                fill_color = self.student_color if completed else COLOR_SCHEME['subtask_not_completed']
+                self.preview_canvas.create_oval(
+                    x - size//2, student_y - size//2,
+                    x + size//2, student_y + size//2,
+                    fill=fill_color,
+                    outline=self.student_color,
+                    width=thickness
+                )
+            
+            # Teacher subtasks (lower row inside)
+            for i, (x, completed) in enumerate([(100, True), (150, False), (200, True), (250, False)]):
+                fill_color = self.teacher_color if completed else COLOR_SCHEME['subtask_not_completed']
+                self.preview_canvas.create_oval(
+                    x - size//2, teacher_y - size//2,
+                    x + size//2, teacher_y + size//2,
+                    fill=fill_color,
+                    outline=self.teacher_color,
+                    width=thickness
+                )
+            
+            # Labels inside task bar
+            self.preview_canvas.create_text(60, student_y, text="S", fill="#FFFFFF", anchor="center", font=("Arial", 8, "bold"))
+            self.preview_canvas.create_text(60, teacher_y, text="T", fill="#FFFFFF", anchor="center", font=("Arial", 8, "bold"))
+        
+        # Add title
+        self.preview_canvas.create_text(300, 25, text=f"Position Mode: {position_mode.title()}", fill="#FFFFFF", anchor="center", font=("Arial", 10, "bold"))
+    
+    def pick_color(self, type_):
+        """Open color picker"""
+        import tkinter.colorchooser as colorchooser
+        
+        if type_ == 'student':
+            color = colorchooser.askcolor(color=self.student_color)[1]
+            if color:
+                self.student_color = color
+                self.student_color_btn.configure(fg_color=color)
+        else:
+            color = colorchooser.askcolor(color=self.teacher_color)[1]
+            if color:
+                self.teacher_color = color
+                self.teacher_color_btn.configure(fg_color=color)
+        
+        self.update_preview()
+    
+    def save_settings(self):
+        """Save settings to global config and persistent storage (re-opening app will apply these)"""
+        COLOR_SCHEME['subtask_size'] = self.size_var.get()
+        COLOR_SCHEME['subtask_thickness'] = self.thickness_var.get()
+        COLOR_SCHEME['subtask_student_border'] = self.student_color
+        COLOR_SCHEME['subtask_teacher_border'] = self.teacher_color
+        COLOR_SCHEME['subtask_position_mode'] = self.position_mode_var.get()
+        COLOR_SCHEME['subtask_spacing'] = self.spacing_var.get()
+        
+        # Save to persistent storage if available
+        if hasattr(self.parent, 'app') and hasattr(self.parent.app, 'config_manager'):
+            self.parent.app.config_manager.set_subtasks_config(
+                size=self.size_var.get(),
+                thickness=self.thickness_var.get(),
+                student_border=self.student_color,
+                teacher_border=self.teacher_color,
+                position_mode=self.position_mode_var.get(),
+                spacing=self.spacing_var.get(),
+                not_completed=COLOR_SCHEME['subtask_not_completed']
+            )
+            
+            messagebox.showinfo("Settings Saved", "Subtasks display settings have been saved and will persist across sessions.")
+        else:
+            messagebox.showinfo("Settings Saved", "Subtasks display settings have been saved for this session.")
+        
+        self.destroy()
+
+class TaskSubtasksManagerDialog(ctk.CTkToplevel):
+    def __init__(self, parent, task):
+        super().__init__(parent)
+        self.parent = parent
+        self.task = task
+        
+        self.title(f"Manage Subtasks - {task.get('title', 'Task')}")
+        self.geometry("600x500")
+        self.resizable(True, True)
+        
+        # Center dialog
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - 600) // 2
+        y = (self.winfo_screenheight() - 500) // 2
+        self.geometry(f"600x500+{x}+{y}")
+        
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Header
+        header_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Subtasks for: {task.get('title', 'Task')}",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        header_label.pack(pady=(0, 15))
+        
+        # Buttons frame
+        buttons_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        buttons_frame.pack(fill='x', pady=(0, 10))
+        
+        self.add_subtask_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Add New Subtask",
+            command=self.add_subtask,
+            width=130
+        )
+        self.add_subtask_btn.pack(side='left', padx=5)
+        
+        self.refresh_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Refresh",
+            command=self.load_subtasks,
+            width=80
+        )
+        self.refresh_btn.pack(side='left', padx=5)
+        
+        # Close button
+        self.close_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Close",
+            command=self.destroy,
+            width=80
+        )
+        self.close_btn.pack(side='right', padx=5)
+        
+        # Subtasks list
+        self.subtasks_frame = ctk.CTkScrollableFrame(self.main_frame)
+        self.subtasks_frame.pack(fill='both', expand=True)
+        
+        # Load initial subtasks
+        self.load_subtasks()
+    
+    def load_subtasks(self):
+        """Load and display subtasks for this task"""
+        # Clear existing content
+        for widget in self.subtasks_frame.winfo_children():
+            widget.destroy()
+        
+        try:
+            # Load subtasks data
+            if hasattr(self.parent, 'parent'):  # TaskDialog
+                app = self.parent.parent.app
+            else:  # Direct from app
+                app = self.parent.app
+            
+            student_data = app.students.get(app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                no_data_label = ctk.CTkLabel(
+                    self.subtasks_frame,
+                    text="No data path available",
+                    font=ctk.CTkFont(size=12)
+                )
+                no_data_label.pack(pady=20)
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                no_file_label = ctk.CTkLabel(
+                    self.subtasks_frame,
+                    text="No data file found",
+                    font=ctk.CTkFont(size=12)
+                )
+                no_file_label.pack(pady=20)
+                return
+            
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                all_subtasks = data.get("subtasks", [])
+            
+            # Filter subtasks for this task
+            task_subtasks = [s for s in all_subtasks if s.get('task_id', '') == self.task.get('id', '')]
+            
+            if not task_subtasks:
+                no_subtasks_label = ctk.CTkLabel(
+                    self.subtasks_frame,
+                    text="No subtasks found for this task.\nClick 'Add New Subtask' to create one.",
+                    font=ctk.CTkFont(size=12),
+                    justify="center"
+                )
+                no_subtasks_label.pack(pady=40)
+                return
+            
+            # Sort by creation date
+            sorted_subtasks = sorted(
+                task_subtasks,
+                key=lambda s: datetime.strptime(s.get('created_date', '2000-01-01 00:00:00'), "%Y-%m-%d %H:%M:%S"),
+                reverse=True
+            )
+            
+            # Display each subtask
+            for subtask in sorted_subtasks:
+                self.create_subtask_item(subtask)
+        
+        except Exception as e:
+            error_label = ctk.CTkLabel(
+                self.subtasks_frame,
+                text=f"Error loading subtasks: {str(e)}",
+                font=ctk.CTkFont(size=12),
+                text_color="#ff6b6b"
+            )
+            error_label.pack(pady=20)
+    
+    def create_subtask_item(self, subtask):
+        """Create a subtask item in the list"""
+        # Main frame for subtask
+        item_frame = ctk.CTkFrame(self.subtasks_frame)
+        item_frame.pack(fill='x', pady=5, padx=5)
+        
+        # Content frame
+        content_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
+        content_frame.pack(fill='x', padx=10, pady=8)
+        
+        # Header with status and title
+        header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        header_frame.pack(fill='x')
+        
+        # Status indicator
+        assignee = subtask.get('assignee', 'Student')
+        completed = subtask.get('completed', False)
+        
+        if assignee == 'Student':
+            border_color = COLOR_SCHEME.get('subtask_student_border', '#1f6aa5')
+        else:
+            border_color = COLOR_SCHEME.get('subtask_teacher_border', '#28a745')
+        
+        fill_color = border_color if completed else COLOR_SCHEME.get('subtask_not_completed', '#000000')
+        
+        status_canvas = tk.Canvas(
+            header_frame,
+            width=20,
+            height=20,
+            bg=COLOR_SCHEME['content_bg'],
+            highlightthickness=0
+        )
+        status_canvas.pack(side='left', padx=(0, 10))
+        
+        status_canvas.create_oval(
+            2, 2, 18, 18,
+            fill=fill_color,
+            outline=border_color,
+            width=2
+        )
+        
+        # Title and info
+        info_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        info_frame.pack(side='left', fill='x', expand=True)
+        
+        title_label = ctk.CTkLabel(
+            info_frame,
+            text=subtask.get('title', 'Untitled Subtask'),
+            font=ctk.CTkFont(size=13, weight="bold"),
+            anchor='w'
+        )
+        title_label.pack(anchor='w')
+        
+        # Status and assignee info
+        status_text = f"Assigned to: {assignee}"
+        if completed:
+            status_text += " | Completed"
+        else:
+            status_text += " | Pending"
+        
+        status_label = ctk.CTkLabel(
+            info_frame,
+            text=status_text,
+            font=ctk.CTkFont(size=11),
+            text_color="#B0B0B0",
+            anchor='w'
+        )
+        status_label.pack(anchor='w')
+        
+        # Description if available
+        description = subtask.get('description', '').strip()
+        if description:
+            desc_label = ctk.CTkLabel(
+                content_frame,
+                text=f"Description: {description}",
+                font=ctk.CTkFont(size=10),
+                text_color="#D0D0D0",
+                anchor='w',
+                wraplength=500
+            )
+            desc_label.pack(anchor='w', pady=(5, 0))
+        
+        # Action buttons
+        actions_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        actions_frame.pack(fill='x', pady=(8, 0))
+        
+        edit_btn = ctk.CTkButton(
+            actions_frame,
+            text="Edit",
+            command=lambda s=subtask: self.edit_subtask(s),
+            width=60,
+            height=25
+        )
+        edit_btn.pack(side='left', padx=(0, 5))
+        
+        if completed:
+            toggle_btn = ctk.CTkButton(
+                actions_frame,
+                text="Mark Pending",
+                command=lambda s=subtask: self.toggle_completion(s, False),
+                width=100,
+                height=25
+            )
+        else:
+            toggle_btn = ctk.CTkButton(
+                actions_frame,
+                text="Complete",
+                command=lambda s=subtask: self.toggle_completion(s, True),
+                width=80,
+                height=25
+            )
+        toggle_btn.pack(side='left', padx=(0, 5))
+        
+        delete_btn = ctk.CTkButton(
+            actions_frame,
+            text="Delete",
+            command=lambda s=subtask: self.delete_subtask(s),
+            width=60,
+            height=25,
+            fg_color="#dc3545",
+            hover_color="#c82333"
+        )
+        delete_btn.pack(side='right')
+    
+    def add_subtask(self):
+        """Add new subtask"""
+        dialog = SubtaskDialog(self.parent, self.task)
+        self.wait_window(dialog)
+        
+        if dialog.subtask_data:
+            self.save_subtask(dialog.subtask_data)
+            self.load_subtasks()  # Refresh list
+    
+    def edit_subtask(self, subtask):
+        """Edit existing subtask"""
+        dialog = SubtaskDialog(self.parent, self.task, subtask)
+        self.wait_window(dialog)
+        
+        if dialog.subtask_data:
+            self.update_subtask(dialog.subtask_data)
+            self.load_subtasks()  # Refresh list
+    
+    def toggle_completion(self, subtask, completed):
+        """Toggle subtask completion"""
+        try:
+            # Get app reference
+            if hasattr(self.parent, 'parent'):  # TaskDialog
+                app = self.parent.parent.app
+            else:  # Direct from app
+                app = self.parent.app
+            
+            student_data = app.students.get(app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            
+            # Load data
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+            
+            # Update subtask
+            current_user = "Teacher" if app.app_mode == "teacher" else "Student"
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            subtasks = data.get("subtasks", [])
+            for i, s in enumerate(subtasks):
+                if s.get('id', '') == subtask.get('id', ''):
+                    subtasks[i]['completed'] = completed
+                    subtasks[i]['last_modified'] = current_time
+                    subtasks[i]['last_modified_by'] = current_user
+                    
+                    if completed:
+                        subtasks[i]['completion_date'] = current_time
+                        subtasks[i]['completed_by'] = current_user
+                    else:
+                        if 'completion_date' in subtasks[i]:
+                            del subtasks[i]['completion_date']
+                        if 'completed_by' in subtasks[i]:
+                            del subtasks[i]['completed_by']
+                    break
+            
+            data["subtasks"] = subtasks
+            
+            # Save data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            self.load_subtasks()  # Refresh list
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
+    
+    def delete_subtask(self, subtask):
+        """Delete subtask"""
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete the subtask '{subtask.get('title', '')}'?"
+        )
+        
+        if not confirm:
+            return
+        
+        try:
+            # Get app reference
+            if hasattr(self.parent, 'parent'):  # TaskDialog
+                app = self.parent.parent.app
+            else:  # Direct from app
+                app = self.parent.app
+            
+            student_data = app.students.get(app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            
+            # Load data
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+            
+            # Remove subtask
+            subtasks = data.get("subtasks", [])
+            subtasks = [s for s in subtasks if s.get('id', '') != subtask.get('id', '')]
+            data["subtasks"] = subtasks
+            
+            # Save data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            self.load_subtasks()  # Refresh list
+            messagebox.showinfo("Success", "Subtask deleted successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete subtask: {str(e)}")
+    
+    def save_subtask(self, subtask_data):
+        """Save new subtask"""
+        try:
+            subtask_data['task_id'] = self.task.get('id', '')
+            
+            # Get app reference
+            if hasattr(self.parent, 'parent'):  # TaskDialog
+                app = self.parent.parent.app
+            else:  # Direct from app
+                app = self.parent.app
+            
+            student_data = app.students.get(app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            
+            # Load existing data
+            if os.path.exists(data_file):
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                data = {"tasks": [], "notes": [], "goals": []}
+            
+            # Add subtasks array if it doesn't exist
+            if "subtasks" not in data:
+                data["subtasks"] = []
+            
+            # Add new subtask
+            data["subtasks"].append(subtask_data)
+            
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            messagebox.showinfo("Success", "Subtask added successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
+    
+    def update_subtask(self, subtask_data):
+        """Update existing subtask"""
+        try:
+            # Get app reference
+            if hasattr(self.parent, 'parent'):  # TaskDialog
+                app = self.parent.parent.app
+            else:  # Direct from app
+                app = self.parent.app
+            
+            student_data = app.students.get(app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            
+            # Load data
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+            
+            # Update subtask
+            subtasks = data.get("subtasks", [])
+            for i, s in enumerate(subtasks):
+                if s.get('id', '') == subtask_data.get('id', ''):
+                    subtasks[i] = subtask_data
+                    break
+            
+            data["subtasks"] = subtasks
+            
+            # Save data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            messagebox.showinfo("Success", "Subtask updated successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
+
+class SubtaskDialog(ctk.CTkToplevel):
+    def __init__(self, parent, task, existing_subtask=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.task = task
+        self.existing_subtask = existing_subtask
+        self.subtask_data = None
+        
+        title_text = "Edit Subtask" if existing_subtask else "Add Subtask"
+        self.title(title_text)
+        self.geometry("400x400")
+        self.resizable(False, False)
+        
+        # Center dialog
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - 400) // 2
+        y = (self.winfo_screenheight() - 400) // 2
+        self.geometry(f"400x400+{x}+{y}")
+        
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Task info
+        task_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Task: {task['title']}",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        task_label.pack(anchor='w', pady=(0, 15))
+        
+        # Subtask title
+        title_label = ctk.CTkLabel(self.main_frame, text="Subtask Title:")
+        title_label.pack(anchor='w', pady=(0, 5))
+        
+        self.title_entry = ctk.CTkEntry(self.main_frame, width=360)
+        self.title_entry.pack(fill='x', pady=(0, 10))
+        
+        # Description
+        desc_label = ctk.CTkLabel(self.main_frame, text="Description:")
+        desc_label.pack(anchor='w', pady=(0, 5))
+        
+        self.desc_text = ctk.CTkTextbox(self.main_frame, height=80)
+        self.desc_text.pack(fill='x', pady=(0, 10))
+        
+        # Assignee
+        assignee_label = ctk.CTkLabel(self.main_frame, text="Assigned To:")
+        assignee_label.pack(anchor='w', pady=(0, 5))
+        
+        self.assignee_var = tk.StringVar(value="Student")
+        assignee_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        assignee_frame.pack(fill='x', pady=(0, 10))
+        
+        student_radio = ctk.CTkRadioButton(
+            assignee_frame,
+            text="Student",
+            variable=self.assignee_var,
+            value="Student"
+        )
+        student_radio.pack(side='left', padx=(0, 20))
+        
+        teacher_radio = ctk.CTkRadioButton(
+            assignee_frame,
+            text="Teacher",
+            variable=self.assignee_var,
+            value="Teacher"
+        )
+        teacher_radio.pack(side='left')
+        
+        # Completed checkbox
+        self.completed_var = tk.BooleanVar(value=False)
+        completed_cb = ctk.CTkCheckBox(
+            self.main_frame,
+            text="Mark as Completed",
+            variable=self.completed_var
+        )
+        completed_cb.pack(anchor='w', pady=(0, 15))
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        button_frame.pack(fill='x')
+        
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self.destroy,
+            fg_color=COLOR_SCHEME['inactive'],
+            width=100
+        )
+        cancel_btn.pack(side='right', padx=(10, 0))
+        
+        save_btn = ctk.CTkButton(
+            button_frame,
+            text="Save Subtask",
+            command=self.save_subtask,
+            width=120
+        )
+        save_btn.pack(side='right')
+        
+        # Populate fields if editing
+        if existing_subtask:
+            self.populate_fields()
+        
+        self.title_entry.focus_set()
+    
+    def populate_fields(self):
+        """Populate fields with existing subtask data"""
+        self.title_entry.insert(0, self.existing_subtask.get('title', ''))
+        self.desc_text.insert('1.0', self.existing_subtask.get('description', ''))
+        self.assignee_var.set(self.existing_subtask.get('assignee', 'Student'))
+        self.completed_var.set(self.existing_subtask.get('completed', False))
+    
+    def save_subtask(self):
+        """Save subtask data"""
+        title = self.title_entry.get().strip()
+        if not title:
+            messagebox.showerror("Error", "Please enter a subtask title")
+            return
+        
+        description = self.desc_text.get('1.0', 'end-1c').strip()
+        assignee = self.assignee_var.get()
+        completed = self.completed_var.get()
+        
+        # Get current user for tracking
+        current_user = "Teacher" if self.parent.app.app_mode == "teacher" else "Student"
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        self.subtask_data = {
+            'id': self.existing_subtask.get('id', str(int(time.time()))) if self.existing_subtask else str(int(time.time())),
+            'title': title,
+            'description': description,
+            'assignee': assignee,
+            'completed': completed,
+            'created_date': self.existing_subtask.get('created_date', current_time) if self.existing_subtask else current_time,
+            'created_by': self.existing_subtask.get('created_by', current_user) if self.existing_subtask else current_user,
+            'last_modified': current_time,
+            'last_modified_by': current_user
+        }
+        
+        # Add completion info if completed
+        if completed and not self.existing_subtask:
+            self.subtask_data['completion_date'] = current_time
+            self.subtask_data['completed_by'] = current_user
+        elif completed and self.existing_subtask and not self.existing_subtask.get('completed', False):
+            self.subtask_data['completion_date'] = current_time
+            self.subtask_data['completed_by'] = current_user
+        
+        self.destroy()
 
 class NotesFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
@@ -6948,6 +8934,516 @@ class NotesFrame(ctk.CTkFrame):
                 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to delete note: {str(e)}")
+
+class SubtasksFrame(ctk.CTkFrame):
+    def __init__(self, parent, app):
+        super().__init__(parent, fg_color="transparent")
+        self.app = app
+        
+        # Subtasks data
+        self.tasks = []
+        self.subtasks = []
+        self.filtered_subtasks = []
+        
+        # Setup UI
+        self.setup_ui()
+        
+        # Load data if student is selected
+        if self.app.current_student and self.app.current_student != "Add a student...":
+            self.load_student_data()
+    
+    def setup_ui(self):
+        # Top control panel
+        self.control_panel = ctk.CTkFrame(self)
+        self.control_panel.pack(fill='x', padx=20, pady=10)
+
+        # Filter options
+        self.filter_frame = ctk.CTkFrame(self.control_panel, fg_color="transparent")
+        self.filter_frame.pack(side='left', padx=10)
+
+        self.filter_label = ctk.CTkLabel(self.filter_frame, text="Filter by Task:")
+        self.filter_label.pack(side='left', padx=5)
+
+        self.filter_var = tk.StringVar(value="All Subtasks")
+        self.filter_menu = ctk.CTkOptionMenu(
+            self.filter_frame,
+            values=["All Subtasks"],
+            variable=self.filter_var,
+            command=self.apply_filter,
+            width=200
+        )
+        self.filter_menu.pack(side='left', padx=5)
+
+        # Status filter
+        self.status_filter_label = ctk.CTkLabel(self.filter_frame, text="Status:")
+        self.status_filter_label.pack(side='left', padx=(20, 5))
+
+        self.status_filter_var = tk.StringVar(value="All")
+        self.status_filter_menu = ctk.CTkOptionMenu(
+            self.filter_frame,
+            values=["All", "Completed", "Pending", "Student Tasks", "Teacher Tasks"],
+            variable=self.status_filter_var,
+            command=self.apply_status_filter,
+            width=120
+        )
+        self.status_filter_menu.pack(side='left', padx=5)
+
+        # Subtasks settings button
+        self.settings_btn = ctk.CTkButton(
+            self.control_panel,
+            text="Subtasks Settings",
+            command=self.show_subtasks_settings,
+            width=140
+        )
+        self.settings_btn.pack(side='right', padx=10)
+
+        # Search bar
+        self.search_frame = ctk.CTkFrame(self.control_panel, fg_color="transparent")
+        self.search_frame.pack(side='right', padx=10)
+
+        self.search_entry = ctk.CTkEntry(
+            self.search_frame,
+            placeholder_text="Search subtasks...",
+            width=200
+        )
+        self.search_entry.pack(side='left', padx=5)
+        self.search_entry.bind("<KeyRelease>", self.search_subtasks)
+
+        # Create main content area
+        self.content_frame = ctk.CTkFrame(self, fg_color=COLOR_SCHEME['content_bg'])
+        self.content_frame.pack(fill='both', expand=True, padx=20, pady=10)
+
+        # Create scrollable subtasks list
+        self.subtask_list = ctk.CTkScrollableFrame(
+            self.content_frame,
+            fg_color="transparent"
+        )
+        self.subtask_list.pack(fill='both', expand=True, padx=10, pady=10)
+    
+    def show_subtasks_settings(self):
+        """Show subtasks settings dialog"""
+        dialog = SubtasksSettingsDialog(self)
+        self.wait_window(dialog)
+    
+    def load_student_data(self):
+        """Load student data including subtasks"""
+        try:
+            # Clear existing content
+            for widget in self.subtask_list.winfo_children():
+                widget.destroy()
+
+            if not self.app.current_student or self.app.current_student == "Add a student...":
+                label = ctk.CTkLabel(
+                    self.subtask_list,
+                    text="Please select a student to view subtasks",
+                    font=ctk.CTkFont(size=14)
+                )
+                label.pack(pady=20)
+                return
+
+            # Get student data
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                no_path_label = ctk.CTkLabel(
+                    self.subtask_list,
+                    text="No data path set for this student",
+                    font=ctk.CTkFont(size=14)
+                )
+                no_path_label.pack(pady=20)
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                # Create default data file
+                default_data = {
+                    "tasks": [],
+                    "notes": [],
+                    "goals": [],
+                    "subtasks": []
+                }
+                with open(data_file, 'w') as f:
+                    json.dump(default_data, f, indent=2)
+                self.tasks = []
+                self.subtasks = []
+            else:
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+                    self.tasks = data.get("tasks", [])
+                    self.subtasks = data.get("subtasks", [])
+
+                    # Initialize subtasks array if it doesn't exist
+                    if "subtasks" not in data:
+                        data["subtasks"] = []
+                        with open(data_file, 'w') as f:
+                            json.dump(data, f, indent=2)
+
+            self.task_filtered_subtasks = self.subtasks.copy()
+
+            # Update task filter dropdown
+            self.update_task_filter()
+            
+            # Apply default filter
+            self.apply_filter("All Subtasks")
+
+        except Exception as e:
+            error_label = ctk.CTkLabel(
+                self.subtask_list,
+                text=f"Error loading subtasks: {str(e)}",
+                font=ctk.CTkFont(size=14),
+                text_color="#ff6b6b"
+            )
+            error_label.pack(pady=20)
+    
+    def update_task_filter(self):
+        """Update task filter dropdown"""
+        filter_options = ["All Subtasks"]
+        
+        # Add task titles that have subtasks
+        task_dict = {task.get('id', ''): task.get('title', '') for task in self.tasks}
+        task_ids = set(subtask.get('task_id', '') for subtask in self.subtasks)
+        
+        for task_id in task_ids:
+            if task_id in task_dict:
+                filter_options.append(task_dict[task_id])
+        
+        self.filter_menu.configure(values=filter_options)
+
+    def apply_filter(self, filter_value):
+        """Apply task filter to subtasks"""
+        # First, filter by task
+        if filter_value == "All Subtasks":
+            self.task_filtered_subtasks = self.subtasks.copy()
+        else:
+            # Find task_id by title
+            task_id = None
+            for task in self.tasks:
+                if task.get('title', '') == filter_value:
+                    task_id = task.get('id', '')
+                    break
+                
+            if task_id:
+                self.task_filtered_subtasks = [s for s in self.subtasks if s.get('task_id', '') == task_id]
+            else:
+                self.task_filtered_subtasks = []
+
+        # Then apply status filter
+        self.apply_status_filter(self.status_filter_var.get())
+
+    def apply_status_filter(self, status_value):
+        """Apply status filter to the task-filtered subtasks"""
+        # Always start from the task-filtered list
+        base_list = getattr(self, 'task_filtered_subtasks', self.subtasks)
+
+        # Apply status filtering
+        if status_value == "All":
+            self.filtered_subtasks = base_list.copy()
+        elif status_value == "Completed":
+            self.filtered_subtasks = [s for s in base_list if s.get('completed', False)]
+        elif status_value == "Pending":
+            self.filtered_subtasks = [s for s in base_list if not s.get('completed', False)]
+        elif status_value == "Student Tasks":
+            self.filtered_subtasks = [s for s in base_list if s.get('assignee', '') == "Student"]
+        elif status_value == "Teacher Tasks":
+            self.filtered_subtasks = [s for s in base_list if s.get('assignee', '') == "Teacher"]
+
+        # Apply search filter
+        search_text = self.search_entry.get().strip().lower()
+        if search_text:
+            self.filtered_subtasks = [
+                s for s in self.filtered_subtasks
+                if search_text in s.get('title', '').lower() or
+                search_text in s.get('description', '').lower()
+            ]
+
+        self.update_subtasks_list()
+
+    def search_subtasks(self, event=None):
+        """Search subtasks"""
+        self.apply_status_filter(self.status_filter_var.get())
+    
+    def update_subtasks_list(self):
+        """Update subtasks list display"""
+        # Clear existing
+        for widget in self.subtask_list.winfo_children():
+            widget.destroy()
+
+        if not self.app.current_student or self.app.current_student == "Add a student...":
+            label = ctk.CTkLabel(
+                self.subtask_list,
+                text="Please select a student to view subtasks",
+                font=ctk.CTkFont(size=14)
+            )
+            label.pack(pady=20)
+            return
+
+        if not self.filtered_subtasks:
+            no_subtasks_label = ctk.CTkLabel(
+                self.subtask_list,
+                text="No subtasks found. Add subtasks from task details or Gantt chart.",
+                font=ctk.CTkFont(size=14)
+            )
+            no_subtasks_label.pack(pady=20)
+            return
+
+        # Create task title lookup
+        task_titles = {task.get('id', ''): task.get('title', '') for task in self.tasks}
+
+        # Sort by creation date (most recent first)
+        sorted_subtasks = sorted(
+            self.filtered_subtasks,
+            key=lambda s: datetime.strptime(s.get('created_date', '2000-01-01 00:00:00'), "%Y-%m-%d %H:%M:%S"),
+            reverse=True
+        )
+
+        # Display subtasks
+        for subtask in sorted_subtasks:
+            self.create_subtask_item(subtask, task_titles)
+    
+    def create_subtask_item(self, subtask, task_titles):
+        """Create subtask item widget"""
+        # Get assignee color
+        assignee = subtask.get('assignee', 'Student')
+        if assignee == 'Student':
+            border_color = COLOR_SCHEME['subtask_student_border']
+        else:
+            border_color = COLOR_SCHEME['subtask_teacher_border']
+        
+        # Create main frame
+        subtask_frame = ctk.CTkFrame(self.subtask_list)
+        subtask_frame.pack(fill='x', pady=5)
+        
+        # Content frame
+        content_frame = ctk.CTkFrame(subtask_frame, fg_color="transparent")
+        content_frame.pack(fill='x', padx=10, pady=10)
+        
+        # Header with status indicator
+        header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        header_frame.pack(fill='x')
+        
+        # Status circle
+        status_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        status_frame.pack(side='left', padx=(0, 10))
+        
+        # Create status indicator using a small canvas
+        status_canvas = tk.Canvas(
+            status_frame,
+            width=20,
+            height=20,
+            bg=COLOR_SCHEME['content_bg'],
+            highlightthickness=0
+        )
+        status_canvas.pack()
+        
+        # Draw status circle
+        completed = subtask.get('completed', False)
+        fill_color = border_color if completed else COLOR_SCHEME['subtask_not_completed']
+        
+        status_canvas.create_oval(
+            2, 2, 18, 18,
+            fill=fill_color,
+            outline=border_color,
+            width=2
+        )
+        
+        # Title and assignee
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side='left', fill='x', expand=True)
+        
+        title_label = ctk.CTkLabel(
+            title_frame,
+            text=subtask.get('title', 'Untitled Subtask'),
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        title_label.pack(anchor='w')
+        
+        # Task reference and assignee
+        task_id = subtask.get('task_id', '')
+        task_title = task_titles.get(task_id, 'Unknown Task')
+        
+        info_text = f"Task: {task_title} | Assigned to: {assignee}"
+        if completed:
+            completion_date = subtask.get('completion_date', '')
+            completed_by = subtask.get('completed_by', '')
+            if completion_date:
+                try:
+                    date_obj = datetime.strptime(completion_date, "%Y-%m-%d %H:%M:%S")
+                    formatted_date = date_obj.strftime("%d %b %Y")
+                    info_text += f" | Completed: {formatted_date}"
+                    if completed_by:
+                        info_text += f" by {completed_by}"
+                except ValueError:
+                    pass
+        
+        info_label = ctk.CTkLabel(
+            title_frame,
+            text=info_text,
+            font=ctk.CTkFont(size=11),
+            text_color="#B0B0B0"
+        )
+        info_label.pack(anchor='w')
+        
+        # Creation and modification dates
+        created_date = subtask.get('created_date', '')
+        if created_date:
+            try:
+                date_obj = datetime.strptime(created_date, "%Y-%m-%d %H:%M:%S")
+                created_text = f"Created: {date_obj.strftime('%d %b %Y at %H:%M')}"
+                created_by = subtask.get('created_by', '')
+                if created_by:
+                    created_text += f" by {created_by}"
+                
+                created_label = ctk.CTkLabel(
+                    title_frame,
+                    text=created_text,
+                    font=ctk.CTkFont(size=10),
+                    text_color="#808080"
+                )
+                created_label.pack(anchor='w')
+            except ValueError:
+                pass
+        
+        # Description if available
+        description = subtask.get('description', '').strip()
+        if description:
+            desc_text = ctk.CTkTextbox(content_frame, height=50)
+            desc_text.pack(fill='x', pady=(5, 0))
+            desc_text.insert('1.0', description)
+            desc_text.configure(state="disabled")
+        
+        # Action buttons
+        button_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        button_frame.pack(fill='x', pady=(10, 0))
+        
+        edit_btn = ctk.CTkButton(
+            button_frame,
+            text="Edit",
+            command=lambda s=subtask: self.edit_subtask(s),
+            width=80,
+            height=25
+        )
+        edit_btn.pack(side='left', padx=5)
+        
+        # Toggle completion button
+        if completed:
+            toggle_btn = ctk.CTkButton(
+                button_frame,
+                text="Mark Pending",
+                command=lambda s=subtask: self.toggle_completion(s, False),
+                width=100,
+                height=25
+            )
+        else:
+            toggle_btn = ctk.CTkButton(
+                button_frame,
+                text="Mark Complete",
+                command=lambda s=subtask: self.toggle_completion(s, True),
+                width=100,
+                height=25
+            )
+        toggle_btn.pack(side='left', padx=5)
+        
+        delete_btn = ctk.CTkButton(
+            button_frame,
+            text="Delete",
+            command=lambda s=subtask: self.delete_subtask(s),
+            width=80,
+            height=25,
+            fg_color="#dc3545",
+            hover_color="#c82333"
+        )
+        delete_btn.pack(side='right', padx=5)
+    
+    def edit_subtask(self, subtask):
+        """Edit subtask"""
+        # Find the parent task
+        task = None
+        for t in self.tasks:
+            if t.get('id', '') == subtask.get('task_id', ''):
+                task = t
+                break
+        
+        if not task:
+            messagebox.showerror("Error", "Parent task not found")
+            return
+        
+        dialog = SubtaskDialog(self, task, subtask)
+        self.wait_window(dialog)
+        
+        if dialog.subtask_data:
+            # Update subtask
+            for i, s in enumerate(self.subtasks):
+                if s.get('id', '') == subtask.get('id', ''):
+                    self.subtasks[i] = dialog.subtask_data
+                    break
+            
+            self.save_student_data()
+            self.apply_filter(self.filter_var.get())
+    
+    def toggle_completion(self, subtask, completed):
+        """Toggle subtask completion status"""
+        current_user = "Teacher" if self.app.app_mode == "teacher" else "Student"
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        for i, s in enumerate(self.subtasks):
+            if s.get('id', '') == subtask.get('id', ''):
+                self.subtasks[i]['completed'] = completed
+                self.subtasks[i]['last_modified'] = current_time
+                self.subtasks[i]['last_modified_by'] = current_user
+                
+                if completed:
+                    self.subtasks[i]['completion_date'] = current_time
+                    self.subtasks[i]['completed_by'] = current_user
+                else:
+                    # Remove completion info when marking as pending
+                    if 'completion_date' in self.subtasks[i]:
+                        del self.subtasks[i]['completion_date']
+                    if 'completed_by' in self.subtasks[i]:
+                        del self.subtasks[i]['completed_by']
+                break
+        
+        self.save_student_data()
+        self.apply_filter(self.filter_var.get())
+    
+    def delete_subtask(self, subtask):
+        """Delete subtask after confirmation"""
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete the subtask '{subtask.get('title', '')}'?"
+        )
+        
+        if confirm:
+            self.subtasks = [s for s in self.subtasks if s.get('id', '') != subtask.get('id', '')]
+            self.save_student_data()
+            self.apply_filter(self.filter_var.get())
+    
+    def save_student_data(self):
+        """Save student data including subtasks"""
+        try:
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            
+            # Load existing data
+            if os.path.exists(data_file):
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                data = {"tasks": [], "notes": [], "goals": []}
+            
+            # Update subtasks
+            data["subtasks"] = self.subtasks
+            
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save subtasks: {str(e)}")
 
 class StudentPathManagerDialog(ctk.CTkToplevel):
     def __init__(self, parent):

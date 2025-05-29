@@ -5,6 +5,7 @@ All notable changes to Meritum will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Subtask feature implementation.
 - Working on: Font size control by users
 
 
