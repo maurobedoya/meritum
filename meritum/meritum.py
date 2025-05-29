@@ -6017,7 +6017,7 @@ class TaskViewDialog(ctk.CTkToplevel):
     
             arrow_header = ctk.CTkLabel(
                 header_frame,
-                text="→",
+                text="->",
                 font=ctk.CTkFont(size=12, weight="bold"),
                 width=30
             )
@@ -6076,7 +6076,7 @@ class TaskViewDialog(ctk.CTkToplevel):
     
                 arrow_label = ctk.CTkLabel(
                     history_entry_frame,
-                    text="→",
+                    text="->",
                     font=ctk.CTkFont(size=12),
                     width=30
                 )
