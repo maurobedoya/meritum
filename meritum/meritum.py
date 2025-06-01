@@ -8,6 +8,7 @@ import customtkinter as ctk
 from datetime import datetime, timedelta
 import platform
 import time
+import sys
 
 APP_VERSION = "0.2.9"
 
