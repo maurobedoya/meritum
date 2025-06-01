@@ -6116,8 +6116,13 @@ class TasksFrame(ctk.CTkFrame):
 
         # Update task list
         self.update_task_list()
-    
-    def search_tasks(self):
+
+    def clear_search(self):
+        """Clear search text and refresh list"""
+        self.search_entry.delete(0, tk.END)
+        self.apply_filter(self.filter_var.get())
+
+    def search_tasks(self, event=None):
         """Search tasks based on search entry"""
         self.apply_filter(self.filter_var.get())
     
@@ -8940,22 +8945,22 @@ class NotesFrame(ctk.CTkFrame):
         self.search_entry.pack(side='left', padx=5)
         self.search_entry.bind("<KeyRelease>", self.search_notes)
 
-        self.search_btn = ctk.CTkButton(
+        self.clear_btn = ctk.CTkButton(
             self.search_frame,
-            text="Search",
-            command=self.search_notes,
+            text="Clear",
+            command=self.clear_search,
             width=80
         )
-        self.search_btn.pack(side='left', padx=5)
+        self.clear_btn.pack(side='left', padx=5)
 
-        # Refresh button
-        self.refresh_btn = ctk.CTkButton(
+        # Add new note button
+        self.add_note_btn = ctk.CTkButton(
             self.control_panel,
-            text="Refresh Notes",
-            command=lambda: self.apply_filter(self.filter_var.get()),
+            text="Add New Note",
+            command=self.add_note,
             width=120
         )
-        self.refresh_btn.pack(side='right', padx=10)
+        self.add_note_btn.pack(side='right', padx=10)
 
         # Create main content area
         self.content_frame = ctk.CTkFrame(self, fg_color=COLOR_SCHEME['content_bg'])
@@ -9133,11 +9138,12 @@ class NotesFrame(ctk.CTkFrame):
                 if os.path.exists(data_file):
                     with open(data_file, 'r') as f:
                         data = json.load(f)
-                        goals = data.get("goals", [])
+                        numbered_goals = self.app.get_goals_with_numbers()
 
-                        # Add goal titles
-                        for goal in goals:
-                            goal_options.append(goal.get('title', ''))
+                        # Add goal titles with numbers
+                        for goal in numbered_goals:
+                            numbered_title = goal.get('numbered_title', goal.get('title', ''))
+                            goal_options.append(numbered_title)
         except Exception as e:
             print(f"Error loading goals: {str(e)}")
 
@@ -9216,8 +9222,60 @@ class NotesFrame(ctk.CTkFrame):
 
         # Update notes list
         self.update_notes_list()
-    
-    def search_notes(self):
+
+    def add_note(self):
+        """Add a new note"""
+        if not self.app.current_student or self.app.current_student == "Add a student...":
+            messagebox.showinfo("Info", "Please select a student first")
+            return
+
+        # Show task selection dialog first
+        dialog = NoteTaskSelectionDialog(self)
+        self.wait_window(dialog)
+
+        if hasattr(dialog, 'selected_task') and dialog.selected_task:
+            note_dialog = NoteDialog(self, dialog.selected_task)
+            self.wait_window(note_dialog)
+
+            if note_dialog.note_data:
+                # Save note to file
+                student_data = self.app.students.get(self.app.current_student, {})
+                data_path = student_data.get("data_path", "")
+
+                if not data_path:
+                    return
+
+                data_file = os.path.join(data_path, "progress_data.json")
+
+                try:
+                    # Load existing data
+                    with open(data_file, 'r') as f:
+                        data = json.load(f)
+
+                    # Add note to notes list
+                    if "notes" not in data:
+                        data["notes"] = []
+
+                    data["notes"].append(note_dialog.note_data)
+
+                    # Save updated data
+                    with open(data_file, 'w') as f:
+                        json.dump(data, f, indent=2)
+
+                    # Refresh notes list
+                    self.load_student_data()
+
+                    messagebox.showinfo("Success", "Note added successfully")
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save note: {str(e)}")
+
+    def clear_search(self):
+        """Clear search text and refresh list"""
+        self.search_entry.delete(0, tk.END)
+        self.apply_filter(self.filter_var.get())
+
+    def search_notes(self, event=None):
         """Search notes based on search entry"""
         self.apply_filter(self.filter_var.get())
     
@@ -9490,6 +9548,102 @@ class NotesFrame(ctk.CTkFrame):
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to delete note: {str(e)}")
 
+class NoteTaskSelectionDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 600
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.selected_task = None
+        
+        self.title("Select Task for Note")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
+        self.resizable(False, False)
+        
+        # Center dialog
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - self.DIALOG_WIDTH) // 2
+        y = (self.winfo_screenheight() - self.DIALOG_HEIGHT) // 2
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
+        
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Select a task to add note to:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        title_label.pack(pady=(0, 15))
+        
+        # Task list
+        self.task_list = ctk.CTkScrollableFrame(self.main_frame)
+        self.task_list.pack(fill='both', expand=True, pady=(0, 15))
+        
+        # Load tasks
+        self.load_tasks()
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        button_frame.pack(fill='x')
+        
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self.destroy,
+            width=100
+        )
+        cancel_btn.pack(side='right', padx=(10, 0))
+    
+    def load_tasks(self):
+        """Load available tasks"""
+        try:
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return
+            
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                tasks = data.get("tasks", [])
+            
+            if not tasks:
+                no_tasks_label = ctk.CTkLabel(
+                    self.task_list,
+                    text="No tasks available. Please create tasks first."
+                )
+                no_tasks_label.pack(pady=20)
+                return
+            
+            # Display tasks
+            for task in tasks:
+                task_btn = ctk.CTkButton(
+                    self.task_list,
+                    text=task.get('title', 'Untitled Task'),
+                    command=lambda t=task: self.select_task(t),
+                    height=30
+                )
+                task_btn.pack(fill='x', pady=2)
+        
+        except Exception as e:
+            error_label = ctk.CTkLabel(
+                self.task_list,
+                text=f"Error loading tasks: {str(e)}"
+            )
+            error_label.pack(pady=20)
+    
+    def select_task(self, task):
+        """Select a task and close dialog"""
+        self.selected_task = task
+        self.destroy()
+
 class SubtasksFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color="transparent")
@@ -9543,15 +9697,6 @@ class SubtasksFrame(ctk.CTkFrame):
         )
         self.status_filter_menu.pack(side='left', padx=5)
 
-        # Subtasks settings button
-        self.settings_btn = ctk.CTkButton(
-            self.control_panel,
-            text="Subtasks Settings",
-            command=self.show_subtasks_settings,
-            width=140
-        )
-        self.settings_btn.pack(side='right', padx=10)
-
         # Search bar
         self.search_frame = ctk.CTkFrame(self.control_panel, fg_color="transparent")
         self.search_frame.pack(side='right', padx=10)
@@ -9563,6 +9708,23 @@ class SubtasksFrame(ctk.CTkFrame):
         )
         self.search_entry.pack(side='left', padx=5)
         self.search_entry.bind("<KeyRelease>", self.search_subtasks)
+        
+        self.clear_btn = ctk.CTkButton(
+            self.search_frame,
+            text="Clear",
+            command=self.clear_search,
+            width=80
+        )
+        self.clear_btn.pack(side='left', padx=5)
+        
+        # Add new subtask button
+        self.add_subtask_btn = ctk.CTkButton(
+            self.control_panel,
+            text="Add New Subtask",
+            command=self.add_subtask,
+            width=140
+        )
+        self.add_subtask_btn.pack(side='right', padx=10)
 
         # Create main content area
         self.content_frame = ctk.CTkFrame(self, fg_color=COLOR_SCHEME['content_bg'])
@@ -9574,11 +9736,6 @@ class SubtasksFrame(ctk.CTkFrame):
             fg_color="transparent"
         )
         self.subtask_list.pack(fill='both', expand=True, padx=10, pady=10)
-    
-    def show_subtasks_settings(self):
-        """Show subtasks settings dialog"""
-        dialog = SubtasksSettingsDialog(self)
-        self.wait_window(dialog)
     
     def load_student_data(self):
         """Load student data including subtasks"""
@@ -9714,7 +9871,41 @@ class SubtasksFrame(ctk.CTkFrame):
 
         self.update_subtasks_list()
 
-    def search_subtasks(self):
+    def add_subtask(self):
+        """Add a new subtask"""
+        if not self.app.current_student or self.app.current_student == "Add a student...":
+            messagebox.showinfo("Info", "Please select a student first")
+            return
+
+        # Show task selection dialog first
+        dialog = SubtaskTaskSelectionDialog(self)
+        self.wait_window(dialog)
+
+        if hasattr(dialog, 'selected_task') and dialog.selected_task:
+            subtask_dialog = SubtaskDialog(self, dialog.selected_task)
+            self.wait_window(subtask_dialog)
+
+            if subtask_dialog.subtask_data:
+                # Add task_id to subtask data
+                subtask_dialog.subtask_data['task_id'] = dialog.selected_task.get('id', '')
+
+                # Add new subtask to list
+                self.subtasks.append(subtask_dialog.subtask_data)
+
+                # Save data
+                self.save_student_data()
+
+                # Refresh list
+                self.apply_filter(self.filter_var.get())
+
+                messagebox.showinfo("Success", "Subtask added successfully")
+
+    def clear_search(self):
+        """Clear search text and refresh list"""
+        self.search_entry.delete(0, tk.END)
+        self.apply_status_filter(self.status_filter_var.get())
+
+    def search_subtasks(self, event=None):
         """Search subtasks"""
         self.apply_status_filter(self.status_filter_var.get())
     
@@ -9999,6 +10190,102 @@ class SubtasksFrame(ctk.CTkFrame):
                 json.dump(data, f, indent=2)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save subtasks: {str(e)}")
+
+class SubtaskTaskSelectionDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 600
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.selected_task = None
+        
+        self.title("Select Task for Subtask")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
+        self.resizable(False, False)
+        
+        # Center dialog
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - self.DIALOG_WIDTH) // 2
+        y = (self.winfo_screenheight() - self.DIALOG_HEIGHT) // 2
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
+        
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            self.main_frame,
+            text="Select a task to add subtask to:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        title_label.pack(pady=(0, 15))
+        
+        # Task list
+        self.task_list = ctk.CTkScrollableFrame(self.main_frame)
+        self.task_list.pack(fill='both', expand=True, pady=(0, 15))
+        
+        # Load tasks
+        self.load_tasks()
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        button_frame.pack(fill='x')
+        
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self.destroy,
+            width=100
+        )
+        cancel_btn.pack(side='right', padx=(10, 0))
+    
+    def load_tasks(self):
+        """Load available tasks"""
+        try:
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return
+            
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                tasks = data.get("tasks", [])
+            
+            if not tasks:
+                no_tasks_label = ctk.CTkLabel(
+                    self.task_list,
+                    text="No tasks available. Please create tasks first."
+                )
+                no_tasks_label.pack(pady=20)
+                return
+            
+            # Display tasks
+            for task in tasks:
+                task_btn = ctk.CTkButton(
+                    self.task_list,
+                    text=task.get('title', 'Untitled Task'),
+                    command=lambda t=task: self.select_task(t),
+                    height=30
+                )
+                task_btn.pack(fill='x', pady=2)
+        
+        except Exception as e:
+            error_label = ctk.CTkLabel(
+                self.task_list,
+                text=f"Error loading tasks: {str(e)}"
+            )
+            error_label.pack(pady=20)
+    
+    def select_task(self, task):
+        """Select a task and close dialog"""
+        self.selected_task = task
+        self.destroy()
 
 class StudentPathManagerDialog(ctk.CTkToplevel):
     def __init__(self, parent):
@@ -10305,6 +10592,16 @@ class SettingsFrame(ctk.CTkFrame):
         )
         self.add_student_btn.pack(anchor='w', padx=20, pady=10)
 
+        # Subtasks settings button
+        self.subtasks_settings_btn = ctk.CTkButton(
+            self.students_frame,
+            text="Subtasks Display Settings",
+            command=self.show_subtasks_settings,
+            width=180,
+            height=35
+        )
+        self.subtasks_settings_btn.pack(anchor='w', padx=20, pady=5)
+
         # About section
         self.about_frame = ctk.CTkFrame(self.main_container)
         self.about_frame.pack(fill='x', padx=20, pady=10)
@@ -10322,6 +10619,11 @@ class SettingsFrame(ctk.CTkFrame):
                  "A tool for tracking student progress using Gantt charts and task management."
         )
         self.app_info.pack(anchor='w', padx=20, pady=5)
+
+    def show_subtasks_settings(self):
+        """Show subtasks settings dialog"""
+        dialog = SubtasksSettingsDialog(self)
+        self.wait_window(dialog)
 
     def update_startup_mode(self):
         """Update the default startup mode in config"""
