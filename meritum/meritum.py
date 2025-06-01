@@ -8,7 +8,6 @@ import customtkinter as ctk
 from datetime import datetime, timedelta
 import platform
 import time
-import sys
 
 APP_VERSION = "0.2.9"
 
@@ -4116,8 +4115,6 @@ class GanttChartFrame(ctk.CTkFrame):
         row_height = 40
         task_height = 30
 
-        chart_height = max(self.gantt_canvas.winfo_height(), len(tasks_to_draw) * row_height + 50)
-
         # Track task rectangles for click events
         self.task_rectangles = []
 
@@ -4427,7 +4424,7 @@ class GanttChartFrame(ctk.CTkFrame):
             # Update the chart with the new filter applied
             self.update_chart()
 
-    def on_assignee_change(self, value):
+    def on_assignee_change(self):
         """Wrapper function to handle assignee filter change"""
         # The value parameter receives the selected dropdown option
         # but we don't need to use it directly since we're using the variable
@@ -5237,7 +5234,7 @@ class TaskDialog(ctk.CTkToplevel):
         self.goal_var.set("All")  # Reset to "All" when loading new data
         self.goal_menu.configure(values=goal_options)
 
-    def update_progress_label(self, *args):
+    def update_progress_label(self):
         """Update progress percentage label"""
         value = self.progress_var.get()
         self.progress_value.configure(text=f"{value}%")
@@ -6011,7 +6008,7 @@ class TasksFrame(ctk.CTkFrame):
         # Update task list
         self.update_task_list()
     
-    def search_tasks(self, event=None):
+    def search_tasks(self):
         """Search tasks based on search entry"""
         self.apply_filter(self.filter_var.get())
     
@@ -8889,7 +8886,7 @@ class NotesFrame(ctk.CTkFrame):
         # Update notes list
         self.update_notes_list()
     
-    def search_notes(self, event=None):
+    def search_notes(self):
         """Search notes based on search entry"""
         self.apply_filter(self.filter_var.get())
     
@@ -9308,7 +9305,7 @@ class SubtasksFrame(ctk.CTkFrame):
 
         self.update_subtasks_list()
 
-    def search_subtasks(self, event=None):
+    def search_subtasks(self):
         """Search subtasks"""
         self.apply_status_filter(self.status_filter_var.get())
     
