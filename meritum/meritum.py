@@ -3939,10 +3939,10 @@ class GanttChartFrame(ctk.CTkFrame):
             # Find all tasks associated with this goal
             goal_id = None
             for goal in self.goals:
-                if goal.get('title', '') == goal_filter:
+                if goal.get('title', '') == original_goal_title:
                     goal_id = goal.get('id', '')
                     break
-
+                
             if goal_id:
                 filtered_tasks = [t for t in filtered_tasks if t.get('goal_id', '') == goal_id]
 
@@ -4105,7 +4105,8 @@ class GanttChartFrame(ctk.CTkFrame):
             self.gantt_canvas.create_text(
                 chart_width // 2,
                 50,
-                text="No tasks found. Add tasks using the 'Add New Task' button.",
+                text="No tasks found. Add tasks using the 'Add New Task' button or update the filters.",
+                anchor='center',
                 fill=COLOR_SCHEME['text'],
                 font=("Arial", 12)
             )
@@ -4412,8 +4413,6 @@ class GanttChartFrame(ctk.CTkFrame):
             Args:
                 value (str): The selected goal title
             """
-            # Extract original title if numbered
-            original_title = self.app.extract_goal_title_from_numbered(value)
 
             # Reset task rectangles to force complete refresh
             self.task_rectangles = []
