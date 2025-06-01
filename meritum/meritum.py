@@ -5237,7 +5237,7 @@ class TaskDialog(ctk.CTkToplevel):
         self.goal_var.set("All")  # Reset to "All" when loading new data
         self.goal_menu.configure(values=goal_options)
 
-    def update_progress_label(self):
+    def update_progress_label(self, *args):
         """Update progress percentage label"""
         value = self.progress_var.get()
         self.progress_value.configure(text=f"{value}%")
