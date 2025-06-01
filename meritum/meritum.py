@@ -4376,6 +4376,7 @@ class GanttChartFrame(ctk.CTkFrame):
                 data_path = student_data.get("data_path", "")
 
                 if not data_path:
+                    messagebox.showerror("Error", "No data path available")
                     return
 
                 data_file = os.path.join(data_path, "progress_data.json")
@@ -4404,7 +4405,7 @@ class GanttChartFrame(ctk.CTkFrame):
                 messagebox.showinfo("Success", "Subtask added successfully")
 
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to save subtask: {str(e)}") 
+                messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
 
     def on_goal_change(self, value):
             """Handle goal filter change in the GanttChartFrame
@@ -5408,8 +5409,8 @@ class TaskDialog(ctk.CTkToplevel):
             subtasks_buttons_frame,
             text="Add Subtask",
             command=self.add_subtask_from_task_dialog,
-            width=120,
-            height=30
+            width=140,
+            height=50
         )
         self.add_subtask_btn.pack(side='left', padx=5)
 
@@ -5418,7 +5419,7 @@ class TaskDialog(ctk.CTkToplevel):
             text="Manage Subtasks",
             command=self.manage_subtasks_from_task_dialog,
             width=140,
-            height=30
+            height=50
         )
         self.manage_subtasks_btn.pack(side='left', padx=5)
 
@@ -8388,6 +8389,8 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
             messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
 
 class SubtaskDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 400
+    DIALOG_HEIGHT = 450
     def __init__(self, parent, task, existing_subtask=None):
         super().__init__(parent)
         self.parent = parent
@@ -8397,14 +8400,14 @@ class SubtaskDialog(ctk.CTkToplevel):
         
         title_text = "Edit Subtask" if existing_subtask else "Add Subtask"
         self.title(title_text)
-        self.geometry("400x400")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(False, False)
         
         # Center dialog
         self.update_idletasks()
-        x = (self.winfo_screenwidth() - 400) // 2
-        y = (self.winfo_screenheight() - 400) // 2
-        self.geometry(f"400x400+{x}+{y}")
+        x = (self.winfo_screenwidth() - self.DIALOG_WIDTH) // 2
+        y = (self.winfo_screenheight() - self.DIALOG_HEIGHT) // 2
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
