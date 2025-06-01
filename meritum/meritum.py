@@ -4651,8 +4651,8 @@ class GanttChartFrame(ctk.CTkFrame):
                 completion_date = datetime.strptime(self.selected_task['completion_date'], "%Y-%m-%d").strftime("%d %b %Y")
                 completed_by = self.selected_task.get('completed_by', 'Unknown')
                 date_text += f" | Completed: {completion_date} by {completed_by}"
-                # Enable subtask button
-                self.add_subtask_btn.configure(state="normal")
+            # Enable subtask button
+            self.add_subtask_btn.configure(state="normal")
 
             self.date_info.configure(text=date_text)
 
