@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import platform
 import time
 import sys
+import re
 
 APP_VERSION = "0.2.9"
 
@@ -1542,11 +1543,10 @@ class StudentProgressApp(ctk.CTk):
 
     def extract_goal_title_from_numbered(self, numbered_title):
         """Extract the original goal title from a numbered display title"""
-        if numbered_title.startswith(("1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.")):
-            # Find the first ". " and return everything after it
-            dot_index = numbered_title.find(". ")
-            if dot_index != -1:
-                return numbered_title[dot_index + 2:]
+        # Use regex to match any number followed by ". "
+        match = re.match(r'^\d+\.\s*(.+)$', numbered_title)
+        if match:
+            return match.group(1)
         return numbered_title
 
     def get_goals_with_numbers(self):
@@ -3936,7 +3936,10 @@ class GanttChartFrame(ctk.CTkFrame):
         # Apply goal filter if applicable
         goal_filter = self.goal_var.get()
         if goal_filter != "All":
-            # Find all tasks associated with this goal
+            # Extract original title from numbered title if needed
+            original_goal_title = self.app.extract_goal_title_from_numbered(goal_filter)
+
+            # Find the goal ID by original title
             goal_id = None
             for goal in self.goals:
                 if goal.get('title', '') == original_goal_title:
