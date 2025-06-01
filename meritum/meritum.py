@@ -1533,6 +1533,54 @@ class StudentProgressApp(ctk.CTk):
             if hasattr(self.current_frame, 'refresh_goal_statistics'):
                 self.current_frame.refresh_goal_statistics()
 
+    def get_numbered_goal_title(goals, goal_id):
+        """Get the numbered title for a goal by its ID"""
+        for index, goal in enumerate(goals):
+            if goal.get('id', '') == goal_id:
+                return f"{index + 1}. {goal.get('title', 'Unknown Goal')}"
+        return "Unknown Goal"
+
+    def extract_goal_title_from_numbered(self, numbered_title):
+        """Extract the original goal title from a numbered display title"""
+        if numbered_title.startswith(("1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.")):
+            # Find the first ". " and return everything after it
+            dot_index = numbered_title.find(". ")
+            if dot_index != -1:
+                return numbered_title[dot_index + 2:]
+        return numbered_title
+
+    def get_goals_with_numbers(self):
+        """Get goals list with numbered titles for dropdowns"""
+        try:
+            if not hasattr(self, 'current_student') or not self.current_student or self.current_student == "Add a student...":
+                return []
+                
+            student_data = self.students.get(self.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return []
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return []
+            
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                goals = data.get("goals", [])
+            
+            # Create numbered goals list
+            numbered_goals = []
+            for index, goal in enumerate(goals):
+                numbered_title = f"{index + 1}. {goal.get('title', '')}"
+                numbered_goal = goal.copy()
+                numbered_goal['numbered_title'] = numbered_title
+                numbered_goals.append(numbered_goal)
+            
+            return numbered_goals
+        except Exception:
+            return []
+
     def show_profile_frame(self):
         # Clear main content
         for widget in self.main_content.winfo_children():
@@ -2591,7 +2639,7 @@ class GoalsFrame(ctk.CTkFrame):
             messagebox.showerror("Error", f"Failed to save student data: {str(e)}")
     
     def update_goals_list(self):
-        """Update the goals list display"""
+        """Update the goals list display with numbering"""
         # Clear existing goals
         for widget in self.goal_list.winfo_children():
             widget.destroy()
@@ -2616,14 +2664,14 @@ class GoalsFrame(ctk.CTkFrame):
             no_goals_label.pack(pady=20)
             return
 
-        # Display goals
-        for goal in self.goals:
-            self.create_goal_item(goal)
+        # Display goals with numbering
+        for index, goal in enumerate(self.goals):
+            self.create_goal_item(goal, index)
             
         # Update overall progress
         self.update_overall_progress()
-    
-    def create_goal_item(self, goal):
+
+    def create_goal_item(self, goal, goal_index=None):
         """Create a goal item widget"""
         # Main goal frame with the goal's color as background
         goal_frame = ctk.CTkFrame(
@@ -2657,10 +2705,16 @@ class GoalsFrame(ctk.CTkFrame):
         )
         color_indicator.pack(side='left', padx=(0, 10))
 
-        # Goal title
+        # Goal title with number
+        goal_title = goal.get('title', 'Untitled Goal')
+        if goal_index is not None:
+            numbered_title = f"{goal_index + 1}. {goal_title}"
+        else:
+            numbered_title = goal_title
+        
         title_label = ctk.CTkLabel(
             title_frame,
-            text=goal.get('title', 'Untitled Goal'),
+            text=numbered_title,
             font=ctk.CTkFont(size=16, weight="bold")
         )
         title_label.pack(side='left')
@@ -4360,6 +4414,9 @@ class GanttChartFrame(ctk.CTkFrame):
             Args:
                 value (str): The selected goal title
             """
+            # Extract original title if numbered
+            original_title = self.app.extract_goal_title_from_numbered(value)
+
             # Reset task rectangles to force complete refresh
             self.task_rectangles = []
 
@@ -4459,9 +4516,11 @@ class GanttChartFrame(ctk.CTkFrame):
 
             # Update goal filter dropdown options
             goal_options = ["All"]
-            for goal in self.goals:
-                if 'title' in goal and goal['title']:
-                    goal_options.append(goal['title'])
+            numbered_goals = self.app.get_goals_with_numbers()
+
+            for goal in numbered_goals:
+                numbered_title = goal.get('numbered_title', goal.get('title', ''))
+                goal_options.append(numbered_title)
 
             self.goal_var.set("All")  # Reset to "All" when loading new data
             self.goal_menu.configure(values=goal_options)
@@ -5038,28 +5097,31 @@ class TaskDialog(ctk.CTkToplevel):
         self.goal_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.goal_frame.pack(fill='x', pady=(0, 10))
 
-        # Get available goals
+        # Initialize goal data
         self.goals = []
         self.goal_titles = ["None"]  # Default option
         self.goal_colors = {"None": "#6c757d"}  # Default color
+
+        # Load goals ONCE using the app's method
         try:
-            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
-            data_path = student_data.get("data_path", "")
+            numbered_goals = self.parent.app.get_goals_with_numbers()
+            for goal in numbered_goals:
+                numbered_title = goal.get('numbered_title', goal.get('title', ''))
+                original_title = goal.get('title', '')
 
-            if data_path:
-                data_file = os.path.join(data_path, "progress_data.json")
-                if os.path.exists(data_file):
-                    with open(data_file, 'r') as f:
-                        data = json.load(f)
-                        self.goals = data.get("goals", [])
+                # Store the original goal data
+                self.goals.append(goal)
 
-                        # Create goal title lookup
-                        for goal in self.goals:
-                            self.goal_titles.append(goal.get('title', ''))
-                            self.goal_colors[goal.get('title', '')] = goal.get('color', '#6c757d')
-        except Exception:
-            pass
-        
+                # Add numbered title to dropdown options (avoid duplicates)
+                if numbered_title not in self.goal_titles:
+                    self.goal_titles.append(numbered_title)
+                    self.goal_colors[numbered_title] = goal.get('color', '#6c757d')
+                    # Also map original title to color for backwards compatibility
+                    self.goal_colors[original_title] = goal.get('color', '#6c757d')
+
+        except Exception as e:
+            print(f"Error loading goals: {str(e)}")
+
         self.goal_var = tk.StringVar(value="None")
         self.goal_dropdown = ctk.CTkOptionMenu(
             self.goal_frame,
@@ -5137,6 +5199,44 @@ class TaskDialog(ctk.CTkToplevel):
         color = self.goal_colors.get(goal_title, "#6c757d")
         self.goal_color.configure(fg_color=color)
 
+    def update_goal_dropdown_with_numbers(self):
+        """Update goal dropdown to show numbered goals"""
+        # Get available goals
+        self.goals = []
+        self.goal_titles = ["None"]  # Default option
+        self.goal_colors = {"None": "#6c757d"}  # Default color
+
+        try:
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if data_path:
+                data_file = os.path.join(data_path, "progress_data.json")
+                if os.path.exists(data_file):
+                    with open(data_file, 'r') as f:
+                        data = json.load(f)
+                        self.goals = data.get("goals", [])
+
+                        # Create numbered goal title lookup
+                        for index, goal in enumerate(self.goals):
+                            numbered_title = f"{index + 1}. {goal.get('title', '')}"
+                            self.goal_titles.append(numbered_title)
+                            self.goal_colors[numbered_title] = goal.get('color', '#6c757d')
+        except Exception:
+            pass
+
+    def update_goal_filter_with_numbers(self):
+        """Update goal filter dropdown to show numbered goals"""
+        # Get available goals for filtering
+        goal_options = ["All"]
+        for index, goal in enumerate(self.goals):
+            if 'title' in goal and goal['title']:
+                numbered_title = f"{index + 1}. {goal['title']}"
+                goal_options.append(numbered_title)
+
+        self.goal_var.set("All")  # Reset to "All" when loading new data
+        self.goal_menu.configure(values=goal_options)
+
     def update_progress_label(self, *args):
         """Update progress percentage label"""
         value = self.progress_var.get()
@@ -5165,11 +5265,14 @@ class TaskDialog(ctk.CTkToplevel):
         goal_id = task.get('goal_id', '')
         if goal_id:
             # Find the goal title
-            for goal in self.goals:
+            numbered_goals = self.parent.app.get_goals_with_numbers()
+            for goal in numbered_goals:
                 if goal.get('id', '') == goal_id:
-                    self.goal_var.set(goal.get('title', ''))
-                    self.on_goal_selected(goal.get('title', ''))
-                    break
+                    numbered_title = goal.get('numbered_title', goal.get('title', ''))
+                    if numbered_title in self.goal_titles:  # Check if it exists in our dropdown
+                        self.goal_var.set(numbered_title)
+                        self.on_goal_selected(numbered_title)
+                        break
     
     def save_task(self):
         """Save task data and close dialog"""
@@ -5231,9 +5334,11 @@ class TaskDialog(ctk.CTkToplevel):
         goal_title = self.goal_var.get()
 
         if goal_title != "None":
+            original_title = self.parent.app.extract_goal_title_from_numbered(goal_title)
             # Find the goal
-            for goal in self.goals:
-                if goal.get('title', '') == goal_title:
+            numbered_goals = self.parent.app.get_goals_with_numbers()
+            for goal in numbered_goals:
+                if goal.get('title', '') == original_title:
                     goal_id = goal.get('id', '')
                     goal_color = goal.get('color', '')
                     break
@@ -5709,6 +5814,33 @@ class TasksFrame(ctk.CTkFrame):
         )
         self.task_list.pack(fill='both', expand=True, padx=10, pady=10)
 
+    def update_goal_filter_tasks_with_numbers(self):
+        """Update goal filter in tasks frame to show numbered goals"""
+        goal_titles = ["All Goals"]
+        for index, goal in enumerate(self.goals):
+            numbered_title = f"{index + 1}. {goal.get('title', '')}"
+            goal_titles.append(numbered_title)
+
+        # Update goal dropdown
+        self.goal_filter_menu.configure(values=goal_titles)
+
+
+
+    def handle_numbered_goal_selection(self, numbered_goal_title):
+        """Handle goal selection when using numbered titles"""
+        if numbered_goal_title == "All" or numbered_goal_title == "All Goals":
+            return "All"
+
+        # Extract the original title
+        original_title = extract_goal_title_from_numbered(numbered_goal_title)
+
+        # Find goal by original title
+        for goal in self.goals:
+            if goal.get('title', '') == original_title:
+                return goal
+
+        return None
+
     def apply_goal_filter(self, goal_title):
         """Apply goal filter and then reapply the main filter"""
         # The full filtering will be done in apply_filter
@@ -5766,8 +5898,11 @@ class TasksFrame(ctk.CTkFrame):
 
             # Get available goals for filtering
             goal_titles = ["All Goals"]
-            for goal in self.goals:
-                goal_titles.append(goal.get('title', ''))
+            numbered_goals = self.app.get_goals_with_numbers()
+
+            for goal in numbered_goals:
+                numbered_title = goal.get('numbered_title', goal.get('title', ''))
+                goal_titles.append(numbered_title)
 
             # Update goal dropdown
             self.goal_filter_menu.configure(values=goal_titles)
@@ -5850,10 +5985,14 @@ class TasksFrame(ctk.CTkFrame):
         # Apply goal filter if set
         goal_filter = self.goal_filter_var.get()
         if goal_filter != "All Goals":
+            # Extract original title from numbered title
+            original_title = self.app.extract_goal_title_from_numbered(goal_filter)
+            
             # Find the goal ID for the selected title
             goal_id = ""
-            for goal in self.goals:
-                if goal.get('title', '') == goal_filter:
+            numbered_goals = self.app.get_goals_with_numbers()
+            for goal in numbered_goals:
+                if goal.get('title', '') == original_title:
                     goal_id = goal.get('id', '')
                     break
                 
@@ -5990,10 +6129,11 @@ class TasksFrame(ctk.CTkFrame):
         goal_id = task.get('goal_id', '')
 
         if goal_id:
-            # Find the goal
-            for goal in self.goals:
+            # Find the goal and get numbered title
+            numbered_goals = self.app.get_goals_with_numbers()
+            for goal in numbered_goals:
                 if goal.get('id', '') == goal_id:
-                    goal_title = goal.get('title', '')
+                    goal_title = goal.get('numbered_title', goal.get('title', ''))
                     goal_color = goal.get('color', None)
                     break
 
@@ -6012,7 +6152,7 @@ class TasksFrame(ctk.CTkFrame):
                 )
                 goal_color_indicator.pack(side='left', padx=(0, 5))
 
-            # Goal label
+            # Goal label with number
             goal_label = ctk.CTkLabel(
                 goal_indicator_frame,
                 text=f"Goal: {goal_title}",
@@ -6378,31 +6518,23 @@ class TaskViewDialog(ctk.CTkToplevel):
         )
         self.assignee_label.pack(anchor='w', pady=2)
     
-        # Goal information
+        # Goal information with numbering
         goal_id = task.get('goal_id', '')
         if goal_id:
-            # Find the goal name and color
+            # Find the goal name and color with numbering
             goal_title = "Unknown"
             goal_color = None
             
             try:
-                # Get student data
-                student_data = self.parent.app.students.get(self.parent.app.current_student, {})
-                data_path = student_data.get("data_path", "")
+                # Get numbered goals
+                numbered_goals = self.parent.app.get_goals_with_numbers()
                 
-                if data_path:
-                    data_file = os.path.join(data_path, "progress_data.json")
-                    if os.path.exists(data_file):
-                        with open(data_file, 'r') as f:
-                            data = json.load(f)
-                            goals = data.get("goals", [])
-                            
-                            # Find the goal
-                            for goal in goals:
-                                if goal.get('id', '') == goal_id:
-                                    goal_title = goal.get('title', 'Unknown')
-                                    goal_color = goal.get('color', None)
-                                    break
+                # Find the goal
+                for goal in numbered_goals:
+                    if goal.get('id', '') == goal_id:
+                        goal_title = goal.get('numbered_title', goal.get('title', 'Unknown'))
+                        goal_color = goal.get('color', None)
+                        break
             except Exception as e:
                 print(f"Error loading goal information: {str(e)}")
             
@@ -8607,6 +8739,20 @@ class NotesFrame(ctk.CTkFrame):
                         data["goals"] = []
                         with open(data_file, 'w') as f:
                             json.dump(data, f, indent=2)
+            
+            # Get goals and update goal filter dropdown with numbers
+            try:
+                goal_options = ["All Goals"]
+                numbered_goals = self.app.get_goals_with_numbers()
+                
+                for goal in numbered_goals:
+                    numbered_title = goal.get('numbered_title', goal.get('title', ''))
+                    goal_options.append(numbered_title)
+            except Exception as e:
+                print(f"Error loading goals: {str(e)}")
+    
+            # Update goal dropdown
+            self.goal_filter_menu.configure(values=goal_options)
 
             # Update task filter dropdown
             self.update_task_filter()
@@ -8697,6 +8843,9 @@ class NotesFrame(ctk.CTkFrame):
         # Check if a goal filter is active
         goal_filter = self.goal_filter_var.get()
         if goal_filter != "All Goals":
+            # Extract original title from numbered title
+            original_title = self.app.extract_goal_title_from_numbered(goal_filter)
+
             # Get the goal ID
             goal_id = ""
             try:
@@ -8710,9 +8859,9 @@ class NotesFrame(ctk.CTkFrame):
                             data = json.load(f)
                             goals = data.get("goals", [])
 
-                            # Find the goal ID
+                            # Find the goal ID by original title
                             for goal in goals:
-                                if goal.get('title', '') == goal_filter:
+                                if goal.get('title', '') == original_title:
                                     goal_id = goal.get('id', '')
                                     break
             except Exception as e:
