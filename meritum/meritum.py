@@ -3208,6 +3208,9 @@ class GoalsFrame(ctk.CTkFrame):
             print(f"Error refreshing goal statistics: {str(e)}")
 
 class GoalDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 675
+    
     def __init__(self, parent, existing_goal=None):
         super().__init__(parent)
         self.parent = parent
@@ -3216,7 +3219,7 @@ class GoalDialog(ctk.CTkToplevel):
         
         title_text = "Edit Goal" if existing_goal else "Add Goal"
         self.title(title_text)
-        self.geometry("500x675")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(False, False)
         
         # Center dialog on parent
@@ -3226,12 +3229,10 @@ class GoalDialog(ctk.CTkToplevel):
         parent_width = self.parent.winfo_width()
         parent_height = self.parent.winfo_height()
         
-        dialog_width = 500
-        dialog_height = 675
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        x = parent_x + (parent_width - self.DIALOG_WIDTH) // 2
+        y = parent_y + (parent_height - self.DIALOG_HEIGHT) // 2
         
-        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         # Create form fields
         self.main_frame = ctk.CTkFrame(self)
@@ -3381,6 +3382,9 @@ class GoalDialog(ctk.CTkToplevel):
         self.destroy()
 
 class ColorPickerDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 550
+    DIALOG_HEIGHT = 500
+    
     def __init__(self, parent, goal):
         super().__init__(parent)
         self.parent = parent
@@ -3388,7 +3392,7 @@ class ColorPickerDialog(ctk.CTkToplevel):
         self.selected_color = None
         
         self.title(f"Choose Color for: {goal.get('title', 'Goal')}")
-        self.geometry("550x500")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(False, False)
         
         # Center dialog on parent
@@ -3398,12 +3402,10 @@ class ColorPickerDialog(ctk.CTkToplevel):
         parent_width = self.parent.winfo_width()
         parent_height = self.parent.winfo_height()
         
-        dialog_width = 550
-        dialog_height = 500
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        x = parent_x + (parent_width - self.DIALOG_WIDTH) // 2
+        y = parent_y + (parent_height - self.DIALOG_HEIGHT) // 2
         
-        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         # Create main frame
         self.main_frame = ctk.CTkFrame(self)
@@ -4991,6 +4993,9 @@ class GanttChartFrame(ctk.CTkFrame):
                 print(f"Error updating goal statistics: {str(e)}")
 
 class TaskDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 600
+    
     def __init__(self, parent, title, existing_task=None):
         super().__init__(parent)
         self.parent = parent
@@ -4998,7 +5003,7 @@ class TaskDialog(ctk.CTkToplevel):
         self.existing_task = existing_task
         
         self.title(title)
-        self.geometry("500x600")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(False, False)
         
         # Center dialog on parent
@@ -5008,12 +5013,10 @@ class TaskDialog(ctk.CTkToplevel):
         parent_width = self.parent.winfo_width()
         parent_height = self.parent.winfo_height()
         
-        dialog_width = 500
-        dialog_height = 600
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        x = parent_x + (parent_width - self.DIALOG_WIDTH) // 2
+        y = parent_y + (parent_height - self.DIALOG_HEIGHT) // 2
         
-        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         # Create form fields
         self.main_frame = ctk.CTkScrollableFrame(self)
@@ -5623,6 +5626,9 @@ class TaskDialog(ctk.CTkToplevel):
             self.subtasks_count_label.configure(text="Error loading count")
 
 class NoteDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 600
+    
     def __init__(self, parent, task):
         super().__init__(parent)
         self.parent = parent
@@ -5630,7 +5636,7 @@ class NoteDialog(ctk.CTkToplevel):
         self.note_data = None
         
         self.title("Add Note")
-        self.geometry("500x450")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(True, True)
         
         # Center dialog on parent
@@ -5640,12 +5646,10 @@ class NoteDialog(ctk.CTkToplevel):
         parent_width = self.parent.winfo_width()
         parent_height = self.parent.winfo_height()
         
-        dialog_width = 500
-        dialog_height = 450
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        x = parent_x + (parent_width - self.DIALOG_WIDTH) // 2
+        y = parent_y + (parent_height - self.DIALOG_HEIGHT) // 2
         
-        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         # Create form fields
         self.main_frame = ctk.CTkFrame(self)
@@ -5724,6 +5728,9 @@ class NoteDialog(ctk.CTkToplevel):
         self.destroy()
 
 class EditNoteDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 600
+    
     def __init__(self, parent, task, note):
         super().__init__(parent)
         self.parent = parent
@@ -5732,7 +5739,7 @@ class EditNoteDialog(ctk.CTkToplevel):
         self.note_data = None
         
         self.title("Edit Note")
-        self.geometry("500x450")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(True, True)
         
         # Center dialog on parent
@@ -5742,12 +5749,10 @@ class EditNoteDialog(ctk.CTkToplevel):
         parent_width = self.parent.winfo_width()
         parent_height = self.parent.winfo_height()
         
-        dialog_width = 500
-        dialog_height = 450
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        x = parent_x + (parent_width - self.DIALOG_WIDTH) // 2
+        y = parent_y + (parent_height - self.DIALOG_HEIGHT) // 2
         
-        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         # Create form fields
         self.main_frame = ctk.CTkFrame(self)
@@ -5889,13 +5894,13 @@ class TasksFrame(ctk.CTkFrame):
         self.search_entry.pack(side='left', padx=5)
         self.search_entry.bind("<KeyRelease>", self.search_tasks)
 
-        self.search_btn = ctk.CTkButton(
+        self.clear_btn = ctk.CTkButton(
             self.search_frame,
-            text="Search",
-            command=self.search_tasks,
+            text="Clear",
+            command=self.clear_search,
             width=80
         )
-        self.search_btn.pack(side='left', padx=5)
+        self.clear_btn.pack(side='left', padx=5)
 
         # Add new task button
         self.add_task_btn = ctk.CTkButton(
@@ -5926,8 +5931,6 @@ class TasksFrame(ctk.CTkFrame):
 
         # Update goal dropdown
         self.goal_filter_menu.configure(values=goal_titles)
-
-
 
     def handle_numbered_goal_selection(self, numbered_goal_title):
         """Handle goal selection when using numbered titles"""
@@ -6548,13 +6551,16 @@ class TasksFrame(ctk.CTkFrame):
             print(f"Error updating goal statistics: {str(e)}")
 
 class TaskViewDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 600
+    
     def __init__(self, parent, task):
         super().__init__(parent)
         self.parent = parent
         self.task = task
     
         self.title("Task Details")
-        self.geometry("600x600")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
     
         # Center dialog on parent
         self.update_idletasks()
@@ -6563,12 +6569,10 @@ class TaskViewDialog(ctk.CTkToplevel):
         parent_width = self.parent.winfo_width()
         parent_height = self.parent.winfo_height()
     
-        dialog_width = 600
-        dialog_height = 600
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        x = parent_x + (parent_width - self.DIALOG_WIDTH) // 2
+        y = parent_y + (parent_height - self.DIALOG_HEIGHT) // 2
     
-        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
     
         # Create main frame
         self.main_frame = ctk.CTkScrollableFrame(self)
@@ -7643,25 +7647,25 @@ class TaskViewDialog(ctk.CTkToplevel):
         """Edit note from the task view dialog"""
         dialog = EditNoteDialog(self.parent, self.task, note)
         self.wait_window(dialog)
-        
+
         if dialog.note_data:
             # Update note in data file
             try:
                 student_data = self.parent.app.students.get(self.parent.app.current_student, {})
                 data_path = student_data.get("data_path", "")
-                
+
                 if not data_path:
                     return
-                
+
                 data_file = os.path.join(data_path, "progress_data.json")
-                
+
                 # Load existing data
                 if os.path.exists(data_file):
                     with open(data_file, 'r') as f:
                         data = json.load(f)
                 else:
                     return
-                
+
                 # Update note
                 notes = data.get("notes", [])
                 for i, n in enumerate(notes):
@@ -7670,57 +7674,57 @@ class TaskViewDialog(ctk.CTkToplevel):
                         break
                     
                 data["notes"] = notes
-                
+
                 # Save updated data
                 with open(data_file, 'w') as f:
                     json.dump(data, f, indent=2)
-                
+
                 # Refresh notes display
                 self.load_task_notes()
-                
+
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to update note: {str(e)}")
-    
+
     def delete_note_from_view(self, note):
         """Delete note from task view"""
         confirm = messagebox.askyesno(
             "Confirm Delete",
             f"Are you sure you want to delete the note '{note.get('title', '')}'?"
         )
-        
+
         if not confirm:
             return
-        
+
         try:
             student_data = self.parent.app.students.get(self.parent.app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
-            
+
             # Load existing data
             if os.path.exists(data_file):
                 with open(data_file, 'r') as f:
                     data = json.load(f)
             else:
                 return
-            
+
             # Remove note
             notes = data.get("notes", [])
             notes = [n for n in notes if n.get('id', '') != note.get('id', '')]
             data["notes"] = notes
-            
+
             # Save updated data
             with open(data_file, 'w') as f:
                 json.dump(data, f, indent=2)
-            
+
             # Refresh notes display
             self.load_task_notes()
-            
+
             messagebox.showinfo("Success", "Note deleted successfully")
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete note: {str(e)}")
 
@@ -7870,18 +7874,21 @@ class TaskViewDialog(ctk.CTkToplevel):
         self.parent.apply_filter(self.parent.filter_var.get())
 
 class SubtasksSettingsDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 600
+    DIALOG_HEIGHT = 650
+    
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.title("Subtasks Settings")
-        self.geometry("600x650")  # Increased height for new options
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(False, False)
         
         # Center dialog
         self.update_idletasks()
-        x = (self.winfo_screenwidth() - 600) // 2
-        y = (self.winfo_screenheight() - 650) // 2
-        self.geometry(f"600x650+{x}+{y}")
+        x = (self.winfo_screenwidth() - self.DIALOG_WIDTH) // 2
+        y = (self.winfo_screenheight() - self.DIALOG_HEIGHT) // 2
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         self.main_frame = ctk.CTkScrollableFrame(self)  # Make scrollable
         self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
@@ -8249,20 +8256,23 @@ class SubtasksSettingsDialog(ctk.CTkToplevel):
         self.destroy()
 
 class TaskSubtasksManagerDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 600
+    DIALOG_HEIGHT = 600
+    
     def __init__(self, parent, task):
         super().__init__(parent)
         self.parent = parent
         self.task = task
         
         self.title(f"Manage Subtasks - {task.get('title', 'Task')}")
-        self.geometry("600x500")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(True, True)
         
         # Center dialog
         self.update_idletasks()
-        x = (self.winfo_screenwidth() - 600) // 2
-        y = (self.winfo_screenheight() - 500) // 2
-        self.geometry(f"600x500+{x}+{y}")
+        x = (self.winfo_screenwidth() - self.DIALOG_WIDTH) // 2
+        y = (self.winfo_screenheight() - self.DIALOG_HEIGHT) // 2
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
@@ -8704,8 +8714,8 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
             messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
 
 class SubtaskDialog(ctk.CTkToplevel):
-    DIALOG_WIDTH = 400
-    DIALOG_HEIGHT = 450
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 600
     def __init__(self, parent, task, existing_subtask=None):
         super().__init__(parent)
         self.parent = parent
@@ -10540,13 +10550,16 @@ class SettingsFrame(ctk.CTkFrame):
         )
 
 class EditStudentDialog(ctk.CTkToplevel):
+    DIALOG_WIDTH = 500
+    DIALOG_HEIGHT = 300
+    
     def __init__(self, parent, student_name):
         super().__init__(parent)
         self.parent = parent
         self.student_name = student_name
         
         self.title(f"Edit Student: {student_name}")
-        self.geometry("500x300")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}")
         self.resizable(False, False)
         
         # Center dialog on parent
@@ -10556,12 +10569,10 @@ class EditStudentDialog(ctk.CTkToplevel):
         parent_width = self.parent.winfo_width()
         parent_height = self.parent.winfo_height()
         
-        dialog_width = 500
-        dialog_height = 300
-        x = parent_x + (parent_width - dialog_width) // 2
-        y = parent_y + (parent_height - dialog_height) // 2
+        x = parent_x + (parent_width - self.DIALOG_WIDTH) // 2
+        y = parent_y + (parent_height - self.DIALOG_HEIGHT) // 2
         
-        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        self.geometry(f"{self.DIALOG_WIDTH}x{self.DIALOG_HEIGHT}+{x}+{y}")
         
         # Create form fields
         self.main_frame = ctk.CTkFrame(self)
