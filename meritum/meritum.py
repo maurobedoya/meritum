@@ -5723,6 +5723,108 @@ class NoteDialog(ctk.CTkToplevel):
         # Close dialog
         self.destroy()
 
+class EditNoteDialog(ctk.CTkToplevel):
+    def __init__(self, parent, task, note):
+        super().__init__(parent)
+        self.parent = parent
+        self.task = task
+        self.note = note
+        self.note_data = None
+        
+        self.title("Edit Note")
+        self.geometry("500x450")
+        self.resizable(True, True)
+        
+        # Center dialog on parent
+        self.update_idletasks()
+        parent_x = self.parent.winfo_rootx()
+        parent_y = self.parent.winfo_rooty()
+        parent_width = self.parent.winfo_width()
+        parent_height = self.parent.winfo_height()
+        
+        dialog_width = 500
+        dialog_height = 450
+        x = parent_x + (parent_width - dialog_width) // 2
+        y = parent_y + (parent_height - dialog_height) // 2
+        
+        self.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+        
+        # Create form fields
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Task info
+        self.task_label = ctk.CTkLabel(
+            self.main_frame,
+            text=f"Task: {task['title']}",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        self.task_label.pack(anchor='w', pady=(0, 10))
+        
+        # Note title
+        self.title_label = ctk.CTkLabel(self.main_frame, text="Note Title:")
+        self.title_label.pack(anchor='w', pady=(0, 5))
+        
+        self.title_entry = ctk.CTkEntry(self.main_frame, width=460)
+        self.title_entry.pack(fill='x', pady=(0, 10))
+        self.title_entry.insert(0, note.get('title', ''))
+        
+        # Note content
+        self.content_label = ctk.CTkLabel(self.main_frame, text="Note Content:")
+        self.content_label.pack(anchor='w', pady=(0, 5))
+        
+        self.content_text = ctk.CTkTextbox(self.main_frame, height=150)
+        self.content_text.pack(fill='both', expand=True, pady=(0, 10))
+        self.content_text.insert('1.0', note.get('content', ''))
+        
+        # Buttons
+        self.button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.button_frame.pack(fill='x', pady=(10, 0))
+        
+        self.cancel_btn = ctk.CTkButton(
+            self.button_frame,
+            text="Cancel",
+            command=self.destroy,
+            fg_color=COLOR_SCHEME['inactive'],
+            width=100
+        )
+        self.cancel_btn.pack(side='right', padx=(10, 0))
+        
+        self.save_btn = ctk.CTkButton(
+            self.button_frame,
+            text="Save Note",
+            command=self.save_note,
+            width=100
+        )
+        self.save_btn.pack(side='right')
+        
+        # Set focus on title entry
+        self.title_entry.focus_set()
+    
+    def save_note(self):
+        """Save note and close dialog"""
+        # Validate fields
+        title = self.title_entry.get().strip()
+        if not title:
+            messagebox.showerror("Error", "Please enter a note title")
+            return
+        
+        content = self.content_text.get('1.0', 'end-1c')
+        if not content:
+            messagebox.showerror("Error", "Please enter note content")
+            return
+        
+        # Create updated note data (preserve original data but update modified fields)
+        self.note_data = self.note.copy()
+        self.note_data.update({
+            'title': title,
+            'content': content,
+            'last_modified': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        
+        # Close dialog
+        self.destroy()
+
 class TasksFrame(ctk.CTkFrame):
     def __init__(self, parent, app):
         super().__init__(parent, fg_color="transparent")
@@ -6805,26 +6907,26 @@ class TaskViewDialog(ctk.CTkToplevel):
         # Clear existing notes
         for widget in self.notes_frame.winfo_children():
             widget.destroy()
-        
+
         # Get notes for this task
         try:
             student_data = self.parent.app.students.get(self.parent.app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
             if not os.path.exists(data_file):
                 return
-            
+
             with open(data_file, 'r') as f:
                 data = json.load(f)
                 notes = data.get("notes", [])
-            
+
             # Filter notes for this task
             task_notes = [note for note in notes if note.get('task_id', '') == self.task.get('id', '')]
-            
+
             if not task_notes:
                 no_notes_label = ctk.CTkLabel(
                     self.notes_frame,
@@ -6833,18 +6935,41 @@ class TaskViewDialog(ctk.CTkToplevel):
                 )
                 no_notes_label.pack(pady=10)
                 return
-            
+
+            # Create a scrollable frame for notes (equal as subtasks)
+            self.notes_container = ctk.CTkFrame(self.notes_frame)
+            self.notes_container.pack(fill='x', pady=(0, 10))
+
+            # Notes content frame (scrollable if many notes)
+            self.notes_content_frame = ctk.CTkScrollableFrame(
+                self.notes_container,
+                height=200  # Fixed height to prevent dialog from growing too large
+            )
+            self.notes_content_frame.pack(fill='both', expand=True, padx=10, pady=10)
+
             # Sort notes by date (most recent first)
             sorted_notes = sorted(
                 task_notes,
                 key=lambda note: datetime.strptime(note.get('date', '2000-01-01 00:00:00'), "%Y-%m-%d %H:%M:%S"),
                 reverse=True
             )
-            
+
+            # Create summary if there are multiple notes
+            if len(sorted_notes) > 1:
+                summary_frame = ctk.CTkFrame(self.notes_content_frame, fg_color=COLOR_SCHEME['content_inside_bg'])
+                summary_frame.pack(fill='x', pady=(0, 10))
+
+                summary_label = ctk.CTkLabel(
+                    summary_frame,
+                    text=f"Total notes: {len(sorted_notes)}",
+                    font=ctk.CTkFont(size=11, weight="bold")
+                )
+                summary_label.pack(padx=10, pady=8)
+
             # Display notes
             for note in sorted_notes:
-                self.create_note_item(note)
-        
+                self.create_note_display_item(note)
+
         except Exception as e:
             print(f"Error loading notes: {e}")
             error_label = ctk.CTkLabel(
@@ -7408,7 +7533,197 @@ class TaskViewDialog(ctk.CTkToplevel):
             content_text.pack(fill='x', padx=10, pady=(0, 10))
             content_text.insert('1.0', content)
             content_text.configure(state="disabled")
+
+    def create_note_display_item(self, note):
+        """Create a display item for a single note"""
+        # Main note frame
+        note_frame = ctk.CTkFrame(self.notes_content_frame)
+        note_frame.pack(fill='x', pady=5)
+
+        # Content frame
+        content_frame = ctk.CTkFrame(note_frame, fg_color="transparent")
+        content_frame.pack(fill='x', padx=8, pady=6)
+
+        # Header with title and date
+        header_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        header_frame.pack(fill='x')
+
+        # Title
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text=note.get('title', 'Untitled Note'),
+            font=ctk.CTkFont(size=12, weight="bold"),
+            anchor='w'
+        )
+        title_label.pack(side='left', fill='x', expand=True)
+
+        # Date
+        note_date = note.get('date', '')
+        if note_date:
+            try:
+                date_obj = datetime.strptime(note_date, "%Y-%m-%d %H:%M:%S")
+                formatted_date = date_obj.strftime("%d %b %Y, %H:%M")
+
+                date_label = ctk.CTkLabel(
+                    header_frame,
+                    text=formatted_date,
+                    font=ctk.CTkFont(size=10),
+                    text_color="#B0B0B0"
+                )
+                date_label.pack(side='right')
+            except ValueError:
+                pass
+            
+        # Show last modified date if different from creation date
+        last_modified = note.get('last_modified', '')
+        if last_modified and last_modified != note.get('date', ''):
+            try:
+                modified_obj = datetime.strptime(last_modified, "%Y-%m-%d %H:%M:%S")
+                formatted_modified = modified_obj.strftime("%d %b %Y, %H:%M")
+
+                modified_label = ctk.CTkLabel(
+                    content_frame,
+                    text=f"Last modified: {formatted_modified}",
+                    font=ctk.CTkFont(size=9),
+                    text_color="#808080",
+                    anchor='w'
+                )
+                modified_label.pack(anchor='w')
+            except ValueError:
+                pass
+            
+        # Note content
+        content = note.get('content', '').strip()
+        if content:
+            # Limit content display to prevent the dialog from becoming too large
+            display_content = content
+            if len(content) > 200:
+                display_content = content[:200] + "..."
+
+            content_label = ctk.CTkLabel(
+                content_frame,
+                text=display_content,
+                font=ctk.CTkFont(size=10),
+                text_color="#D0D0D0",
+                anchor='w',
+                wraplength=400,
+                justify="left"
+            )
+            content_label.pack(anchor='w', pady=(3, 0))
+
+        # Action buttons for each note
+        buttons_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        buttons_frame.pack(fill='x', pady=(5, 0))
+
+        # Edit button
+        edit_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Edit",
+            command=lambda n=note: self.edit_note_from_view(n),
+            width=60,
+            height=20,
+            font=ctk.CTkFont(size=10)
+        )
+        edit_btn.pack(side='left', padx=(0, 5))
+
+        # Delete button
+        delete_btn = ctk.CTkButton(
+            buttons_frame,
+            text="Delete",
+            command=lambda n=note: self.delete_note_from_view(n),
+            width=60,
+            height=20,
+            font=ctk.CTkFont(size=10),
+            fg_color="#dc3545",
+            hover_color="#c82333"
+        )
+        delete_btn.pack(side='right')
+
+    def edit_note_from_view(self, note):
+        """Edit note from the task view dialog"""
+        dialog = EditNoteDialog(self.parent, self.task, note)
+        self.wait_window(dialog)
+        
+        if dialog.note_data:
+            # Update note in data file
+            try:
+                student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+                data_path = student_data.get("data_path", "")
+                
+                if not data_path:
+                    return
+                
+                data_file = os.path.join(data_path, "progress_data.json")
+                
+                # Load existing data
+                if os.path.exists(data_file):
+                    with open(data_file, 'r') as f:
+                        data = json.load(f)
+                else:
+                    return
+                
+                # Update note
+                notes = data.get("notes", [])
+                for i, n in enumerate(notes):
+                    if n.get('id', '') == note.get('id', ''):
+                        notes[i] = dialog.note_data
+                        break
+                    
+                data["notes"] = notes
+                
+                # Save updated data
+                with open(data_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+                
+                # Refresh notes display
+                self.load_task_notes()
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update note: {str(e)}")
     
+    def delete_note_from_view(self, note):
+        """Delete note from task view"""
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete the note '{note.get('title', '')}'?"
+        )
+        
+        if not confirm:
+            return
+        
+        try:
+            student_data = self.parent.app.students.get(self.parent.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+            
+            if not data_path:
+                return
+            
+            data_file = os.path.join(data_path, "progress_data.json")
+            
+            # Load existing data
+            if os.path.exists(data_file):
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                return
+            
+            # Remove note
+            notes = data.get("notes", [])
+            notes = [n for n in notes if n.get('id', '') != note.get('id', '')]
+            data["notes"] = notes
+            
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            # Refresh notes display
+            self.load_task_notes()
+            
+            messagebox.showinfo("Success", "Note deleted successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete note: {str(e)}")
+
     def add_note(self):
         """Add a note to the task"""
         dialog = NoteDialog(self.parent, self.task)
@@ -8957,22 +9272,22 @@ class NotesFrame(ctk.CTkFrame):
         """Create a note item widget"""
         note_frame = ctk.CTkFrame(self.note_list)
         note_frame.pack(fill='x', pady=5)
-        
+
         # Get associated task
         task_id = note.get('task_id', '')
         task_title = task_titles.get(task_id, 'Unknown Task')
-        
+
         # Note header
         header_frame = ctk.CTkFrame(note_frame, fg_color="transparent")
         header_frame.pack(fill='x', padx=10, pady=(10, 5))
-        
+
         title_label = ctk.CTkLabel(
             header_frame,
             text=note.get('title', 'Note'),
             font=ctk.CTkFont(size=14, weight="bold")
         )
         title_label.pack(side='left')
-        
+
         # Format date
         note_date = note.get('date', '')
         if note_date:
@@ -8983,25 +9298,41 @@ class NotesFrame(ctk.CTkFrame):
                 formatted_date = note_date
         else:
             formatted_date = ""
-        
+
         date_label = ctk.CTkLabel(
             header_frame,
             text=formatted_date,
             font=ctk.CTkFont(size=10)
         )
         date_label.pack(side='right')
-        
+
         # Task reference
         task_frame = ctk.CTkFrame(note_frame, fg_color="transparent")
         task_frame.pack(fill='x', padx=10, pady=(0, 5))
-        
+
         task_ref_label = ctk.CTkLabel(
             task_frame,
             text=f"Task: {task_title}",
             font=ctk.CTkFont(size=12)
         )
         task_ref_label.pack(anchor='w')
-        
+
+        # Show last modified date if available
+        last_modified = note.get('last_modified', '')
+        if last_modified and last_modified != note.get('date', ''):
+            try:
+                modified_obj = datetime.strptime(last_modified, "%Y-%m-%d %H:%M:%S")
+                formatted_modified = modified_obj.strftime("%d %b %Y, %H:%M")
+                modified_label = ctk.CTkLabel(
+                    task_frame,
+                    text=f"Last modified: {formatted_modified}",
+                    font=ctk.CTkFont(size=10),
+                    text_color="#B0B0B0"
+                )
+                modified_label.pack(anchor='w')
+            except ValueError:
+                pass
+            
         # Note content
         content = note.get('content', '').strip()
         if content:
@@ -9009,11 +9340,11 @@ class NotesFrame(ctk.CTkFrame):
             content_text.pack(fill='x', padx=10, pady=(0, 10))
             content_text.insert('1.0', content)
             content_text.configure(state="disabled")
-        
+
         # Action buttons
         button_frame = ctk.CTkFrame(note_frame, fg_color="transparent")
         button_frame.pack(fill='x', padx=10, pady=(0, 10))
-        
+
         view_task_btn = ctk.CTkButton(
             button_frame,
             text="View Task",
@@ -9022,7 +9353,16 @@ class NotesFrame(ctk.CTkFrame):
             height=25
         )
         view_task_btn.pack(side='left', padx=5)
-        
+
+        edit_btn = ctk.CTkButton(
+            button_frame,
+            text="Edit Note",
+            command=lambda n=note: self.edit_note(n),
+            width=100,
+            height=25
+        )
+        edit_btn.pack(side='left', padx=5)
+
         delete_btn = ctk.CTkButton(
             button_frame,
             text="Delete Note",
@@ -9033,7 +9373,60 @@ class NotesFrame(ctk.CTkFrame):
             hover_color="#c82333"
         )
         delete_btn.pack(side='right', padx=5)
-    
+
+    def edit_note(self, note):
+        """Edit note"""
+        # Find the task
+        task = None
+        for t in self.tasks:
+            if t.get('id', '') == note.get('task_id', ''):
+                task = t
+                break
+            
+        if not task:
+            messagebox.showerror("Error", "Associated task not found")
+            return
+
+        dialog = EditNoteDialog(self, task, note)
+        self.wait_window(dialog)
+
+        if dialog.note_data:
+            # Update note in data file
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+
+            try:
+                # Load existing data
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+
+                # Update note
+                notes = data.get("notes", [])
+                for i, n in enumerate(notes):
+                    if n.get('id', '') == note.get('id', ''):
+                        notes[i] = dialog.note_data
+                        break
+                    
+                data["notes"] = notes
+
+                # Save updated data
+                with open(data_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+
+                # Update local notes list
+                self.notes = notes
+                self.apply_filter(self.filter_var.get())
+
+                messagebox.showinfo("Success", "Note updated successfully")
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update note: {str(e)}")
+
     def view_task(self, task_id):
         """View the task associated with a note"""
         # Find the task
