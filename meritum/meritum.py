@@ -3825,6 +3825,27 @@ class GanttChartFrame(ctk.CTkFrame):
             state="disabled"
         )
         self.add_subtask_btn.pack(side='left', padx=5)
+
+        self.duplicate_btn = ctk.CTkButton(
+            self.action_frame,
+            text="Duplicate Task",
+            command=self.duplicate_task,
+            width=120,
+            state="disabled"
+        )
+        self.duplicate_btn.pack(side='left', padx=5)
+
+        self.delete_btn = ctk.CTkButton(
+            self.action_frame,
+            text="Delete Task",
+            command=self.delete_task,
+            width=100,
+            height=30,
+            fg_color="#dc3545",
+            hover_color="#c82333",
+            state="disabled"
+        )
+        self.delete_btn.pack(side='left', padx=5)
         
         # Initialize empty chart
         self.update_chart()
@@ -4126,7 +4147,15 @@ class GanttChartFrame(ctk.CTkFrame):
         self.task_rectangles = []
 
         # Sort tasks by start date
-        sorted_tasks = sorted(tasks_to_draw, key=lambda t: datetime.strptime(t['start_date'], "%Y-%m-%d"))
+        def safe_parse_date(date_value):
+            if isinstance(date_value, str):
+                return datetime.strptime(date_value, "%Y-%m-%d")
+            elif isinstance(date_value, datetime):
+                return date_value
+            else:
+                return datetime.now()  # Fallback
+
+        sorted_tasks = sorted(tasks_to_draw, key=lambda t: safe_parse_date(t['start_date']))
 
         # Load subtasks data
         subtasks = self.load_subtasks_data()
@@ -4409,6 +4438,198 @@ class GanttChartFrame(ctk.CTkFrame):
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
 
+    def duplicate_task(self):
+        """Duplicate the selected task with new dates"""
+        if not self.selected_task:
+            return
+
+        # Create a copy of the task with new ID and updated dates
+        new_task = self.selected_task.copy()
+        new_task['id'] = str(int(time.time()))
+        new_task['title'] = f"Copy of {new_task['title']}"
+
+        # Reset completion status for the duplicate
+        new_task['completed'] = False
+        new_task['progress'] = 0
+        new_task['completion_date'] = None
+        new_task['completed_by'] = None
+
+        # Update creation info
+        current_user = "Teacher" if self.app.app_mode == "teacher" else "Student"
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        new_task['created_date'] = current_date
+        new_task['last_modified'] = current_date
+        new_task['last_modified_by'] = current_user
+        new_task['progress_history'] = []
+
+        # Calculate new dates (start from original end date + 0 day)
+        try:
+            original_start = datetime.strptime(self.selected_task['start_date'], "%Y-%m-%d")
+            original_end = datetime.strptime(self.selected_task['end_date'], "%Y-%m-%d")
+            duration = (original_end - original_start).days
+
+            new_start = original_start
+            new_end = new_start + timedelta(days=duration)
+
+            # IMPORTANT: Convert back to strings
+            new_task['start_date'] = new_start.strftime("%Y-%m-%d")
+            new_task['end_date'] = new_end.strftime("%Y-%m-%d")
+        except ValueError:
+            # If date parsing fails, use today and next week
+            today = datetime.now()
+            new_task['start_date'] = today.strftime("%Y-%m-%d")
+            new_task['end_date'] = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+
+        # Add the new task
+        self.tasks.append(new_task)
+
+        # Save data with error handling
+        try:
+            self.save_student_data()
+
+            # Update goal statistics
+            self.update_goal_statistics()
+
+            # Update chart
+            self.update_chart()
+
+            messagebox.showinfo("Success", f"Task duplicated successfully as '{new_task['title']}'")
+
+        except Exception as e:
+            # If save failed, remove the task from the list to prevent corruption
+            if new_task in self.tasks:
+                self.tasks.remove(new_task)
+
+            messagebox.showerror("Error", f"Failed to duplicate task: {str(e)}")
+            print(f"Duplicate task error: {str(e)}")
+
+    def delete_task(self):
+        """Delete the selected task after confirmation"""
+        if not self.selected_task:
+            return
+
+        # Check how many subtasks are associated with this task
+        subtask_count = self.count_task_subtasks(self.selected_task.get('id', ''))
+
+        # Create confirmation message
+        message = f"Are you sure you want to delete the task '{self.selected_task.get('title', '')}'?"
+        if subtask_count > 0:
+            message += f"\n\nThis task has {subtask_count} associated subtasks that will also be deleted."
+
+        confirm = messagebox.askyesno("Confirm Delete", message)
+
+        if confirm:
+            task_id = self.selected_task.get('id', '')
+            task_title = self.selected_task.get('title', '')
+
+            # Remove task from list
+            self.tasks = [t for t in self.tasks if t.get('id', '') != task_id]
+
+            # Remove associated subtasks
+            self.delete_task_subtasks(task_id)
+
+            # Remove associated notes
+            self.delete_task_notes(task_id)
+
+            # Clear selected task
+            self.selected_task = None
+
+            # Save data with error handling
+            try:
+                self.save_student_data()
+
+                # Update goal statistics
+                self.update_goal_statistics()
+
+                # Update chart
+                self.update_chart()
+
+                # Update task details panel
+                self.update_task_details()
+
+                messagebox.showinfo("Success", f"Task '{task_title}' deleted successfully")
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete task: {str(e)}")
+                print(f"Delete task error: {str(e)}")
+
+    def count_task_subtasks(self, task_id):
+        """Count subtasks associated with a task"""
+        try:
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return 0
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return 0
+
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                subtasks = data.get("subtasks", [])
+
+            # Count subtasks with this task_id
+            return len([s for s in subtasks if s.get('task_id', '') == task_id])
+
+        except Exception:
+            return 0
+
+    def delete_task_subtasks(self, task_id):
+        """Delete all subtasks associated with a task"""
+        try:
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return
+
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+
+            # Remove subtasks with this task_id
+            subtasks = data.get("subtasks", [])
+            data["subtasks"] = [s for s in subtasks if s.get('task_id', '') != task_id]
+
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+        except Exception as e:
+            print(f"Error deleting task subtasks: {str(e)}")
+
+    def delete_task_notes(self, task_id):
+        """Delete all notes associated with a task"""
+        try:
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                return
+
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+
+            # Remove notes with this task_id
+            notes = data.get("notes", [])
+            data["notes"] = [n for n in notes if n.get('task_id', '') != task_id]
+
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+        except Exception as e:
+            print(f"Error deleting task notes: {str(e)}")
+
     def on_goal_change(self, value):
             """Handle goal filter change in the GanttChartFrame
 
@@ -4574,7 +4795,7 @@ class GanttChartFrame(ctk.CTkFrame):
                 print(f"Error saving synchronized task colors: {str(e)}")
 
     def save_student_data(self):
-        """Save student data to JSON file"""
+        """Save student data to JSON file with validation"""
         try:
             student_data = self.app.students.get(self.app.current_student, {})
             data_path = student_data.get("data_path", "")
@@ -4584,21 +4805,26 @@ class GanttChartFrame(ctk.CTkFrame):
             
             data_file = os.path.join(data_path, "progress_data.json")
             
-            # Load existing data to preserve notes
+            # Load existing data to preserve notes and goals
             if os.path.exists(data_file):
                 with open(data_file, 'r') as f:
                     data = json.load(f)
             else:
-                data = {"notes": []}
+                data = {"notes": [], "goals": []}
             
             # Update tasks
             data["tasks"] = self.tasks
             
+            # Validate JSON before saving
+            json_str = json.dumps(data, indent=2)
+            json.loads(json_str)  # This will raise an error if JSON is invalid
+            
             # Save updated data
             with open(data_file, 'w') as f:
-                json.dump(data, f, indent=2)
+                f.write(json_str)
+                
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save student data: {str(e)}")
+            raise Exception(f"Failed to save student data: {str(e)}")
     
     def sync_scroll(self, *args):
         """Synchronize scrolling between header and chart canvas"""
@@ -4746,7 +4972,9 @@ class GanttChartFrame(ctk.CTkFrame):
                 self.add_note_btn.configure(state="normal")
                 self.complete_btn.configure(state="normal", text="Mark Complete")
                 self.not_complete_btn.configure(state="disabled")
-
+            
+            self.duplicate_btn.configure(state="normal")
+            self.delete_btn.configure(state="normal")
         else:
             # Reset task details
             self.task_label.configure(text="Select a task to view details")
@@ -4760,6 +4988,8 @@ class GanttChartFrame(ctk.CTkFrame):
             self.not_complete_btn.configure(state="disabled")
             self.add_note_btn.configure(state="disabled")
             self.add_subtask_btn.configure(state="disabled")
+            self.duplicate_btn.configure(state="disabled")
+            self.delete_btn.configure(state="disabled")
     
     def on_canvas_configure(self, event):
         """Handle canvas resize"""
@@ -6033,31 +6263,36 @@ class TasksFrame(ctk.CTkFrame):
             print(f"Error loading student data: {str(e)}")
     
     def save_student_data(self):
-        """Save student data to JSON file"""
+        """Save student data to JSON file with validation"""
         try:
             student_data = self.app.students.get(self.app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
-            
-            # Load existing data to preserve notes
+
+            # Load existing data to preserve notes and goals
             if os.path.exists(data_file):
                 with open(data_file, 'r') as f:
                     data = json.load(f)
             else:
-                data = {"notes": []}
-            
+                data = {"notes": [], "goals": []}
+
             # Update tasks
             data["tasks"] = self.tasks
-            
+
+            # Validate JSON before saving
+            json_str = json.dumps(data, indent=2)
+            json.loads(json_str)  # This will raise an error if JSON is invalid
+
             # Save updated data
             with open(data_file, 'w') as f:
-                json.dump(data, f, indent=2)
+                f.write(json_str)
+
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save student data: {str(e)}")
+            raise Exception(f"Failed to save student data: {str(e)}")
     
     def apply_filter(self, filter_type):
         """Apply filter to task list"""
@@ -6320,6 +6555,16 @@ class TasksFrame(ctk.CTkFrame):
         )
         edit_btn.pack(side='left', padx=5)
 
+        # Duplicate button
+        duplicate_btn = ctk.CTkButton(
+            button_frame,
+            text="Duplicate",
+            command=lambda t=task: self.duplicate_task(t),
+            width=80,
+            height=25
+        )
+        duplicate_btn.pack(side='left', padx=5)
+
         # Complete button (only show if not completed)
         if not task.get('completed', False):
             complete_btn = ctk.CTkButton(
@@ -6353,6 +6598,69 @@ class TasksFrame(ctk.CTkFrame):
         )
         delete_btn.pack(side='right', padx=5)
     
+    def duplicate_task(self, task):
+        """Duplicate a task with new dates"""
+        # Create a copy of the task with new ID and updated dates
+        new_task = task.copy()
+        new_task['id'] = str(int(time.time()))
+        new_task['title'] = f"Copy of {new_task['title']}"
+
+        # Reset completion status for the duplicate
+        new_task['completed'] = False
+        new_task['progress'] = 0
+        new_task['completion_date'] = None
+        new_task['completed_by'] = None
+
+        # Update creation info
+        current_user = "Teacher" if self.app.app_mode == "teacher" else "Student"
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        new_task['created_date'] = current_date
+        new_task['last_modified'] = current_date
+        new_task['last_modified_by'] = current_user
+        new_task['progress_history'] = []
+
+        # Calculate new dates (start from original end date + 0 day)
+        # TO:DO: Add setting for new dates by default in the duplication.
+        try:
+            original_start = datetime.strptime(task['start_date'], "%Y-%m-%d")
+            original_end = datetime.strptime(task['end_date'], "%Y-%m-%d")
+            duration = (original_end - original_start).days
+
+            new_start = original_start
+            new_end = new_start + timedelta(days=duration)
+
+            # IMPORTANT: Convert back to strings
+            new_task['start_date'] = new_start.strftime("%Y-%m-%d")
+            new_task['end_date'] = new_end.strftime("%Y-%m-%d")
+        except ValueError:
+            # If date parsing fails, use today and next week
+            today = datetime.now()
+            new_task['start_date'] = today.strftime("%Y-%m-%d")
+            new_task['end_date'] = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+
+        # Add the new task
+        self.tasks.append(new_task)
+
+        # Save data with error handling
+        try:
+            self.save_student_data()
+
+            # Update goal statistics
+            self.update_goal_statistics()
+
+            # Update task list
+            self.apply_filter(self.filter_var.get())
+
+            messagebox.showinfo("Success", f"Task duplicated successfully as '{new_task['title']}'")
+
+        except Exception as e:
+            # If save failed, remove the task from the list to prevent corruption
+            if new_task in self.tasks:
+                self.tasks.remove(new_task)
+
+            messagebox.showerror("Error", f"Failed to duplicate task: {str(e)}")
+            print(f"Duplicate task error: {str(e)}")
+
     def add_task(self):
         """Open dialog to add a new task"""
         if not self.app.current_student or self.app.current_student == "Add a student...":
@@ -7799,7 +8107,74 @@ class TaskViewDialog(ctk.CTkToplevel):
             # Close this dialog and refresh task list
             self.destroy()
             self.parent.apply_filter(self.parent.filter_var.get())
-    
+
+    def duplicate_task(self):
+        """Duplicate the current task"""
+        # Create a copy of the task with new ID and updated dates
+        new_task = self.task.copy()
+        new_task['id'] = str(int(time.time()))
+        new_task['title'] = f"Copy of {new_task['title']}"
+
+        # Reset completion status for the duplicate
+        new_task['completed'] = False
+        new_task['progress'] = 0
+        new_task['completion_date'] = None
+        new_task['completed_by'] = None
+
+        # Update creation info
+        current_user = "Teacher" if self.parent.app.app_mode == "teacher" else "Student"
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        new_task['created_date'] = current_date
+        new_task['last_modified'] = current_date
+        new_task['last_modified_by'] = current_user
+        new_task['progress_history'] = []
+
+        # Calculate new dates (start from original end date + 0 day)
+        try:
+            original_start = datetime.strptime(self.task['start_date'], "%Y-%m-%d")
+            original_end = datetime.strptime(self.task['end_date'], "%Y-%m-%d")
+            duration = (original_end - original_start).days
+
+            new_start = original_start
+            new_end = new_start + timedelta(days=duration)
+
+            # IMPORTANT: Convert back to strings
+            new_task['start_date'] = new_start.strftime("%Y-%m-%d")
+            new_task['end_date'] = new_end.strftime("%Y-%m-%d")
+        except ValueError:
+            # If date parsing fails, use today and next week
+            today = datetime.now()
+            new_task['start_date'] = today.strftime("%Y-%m-%d")
+            new_task['end_date'] = (today + timedelta(days=7)).strftime("%Y-%m-%d")
+
+        # Add the new task to parent's task list
+        self.parent.tasks.append(new_task)
+
+        # Save data with error handling
+        try:
+            self.parent.save_student_data()
+
+            # Update goal statistics if method exists
+            if hasattr(self.parent, 'update_goal_statistics'):
+                self.parent.update_goal_statistics()
+
+            # Close this dialog and refresh task list
+            self.destroy()
+            self.parent.apply_filter(self.parent.filter_var.get())
+
+            messagebox.showinfo("Success", f"Task duplicated successfully as '{new_task['title']}'")
+
+        except Exception as e:
+            # If save failed, remove the task from the list to prevent corruption
+            if new_task in self.parent.tasks:
+                self.parent.tasks.remove(new_task)
+
+            messagebox.showerror("Error", f"Failed to duplicate task: {str(e)}")
+            print(f"Duplicate task error: {str(e)}")
+
+            # Don't close the dialog if there was an error
+            return
+
     def mark_complete(self):
         """Mark task as complete"""
         # Get the current user (teacher or student)
@@ -8331,17 +8706,38 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
         # Clear existing content
         for widget in self.subtasks_frame.winfo_children():
             widget.destroy()
-        
+
         try:
             # Load subtasks data
-            if hasattr(self.parent, 'parent'):  # TaskDialog
-                app = self.parent.parent.app
-            else:  # Direct from app
+            if hasattr(self.parent, 'app'):
                 app = self.parent.app
-            
+            elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+                app = self.parent.parent.app
+            else:
+                # Fallback: try to find app through the widget hierarchy
+                current = self.parent
+                app = None
+                while current and app is None:
+                    if hasattr(current, 'app'):
+                        app = current.app
+                        break
+                    elif hasattr(current, 'parent'):
+                        current = current.parent
+                    else:
+                        break
+                    
+                if app is None:
+                    no_data_label = ctk.CTkLabel(
+                        self.subtasks_frame,
+                        text="Could not find app reference",
+                        font=ctk.CTkFont(size=12)
+                    )
+                    no_data_label.pack(pady=20)
+                    return
+
             student_data = app.students.get(app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 no_data_label = ctk.CTkLabel(
                     self.subtasks_frame,
@@ -8350,7 +8746,7 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
                 )
                 no_data_label.pack(pady=20)
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
             if not os.path.exists(data_file):
                 no_file_label = ctk.CTkLabel(
@@ -8360,14 +8756,14 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
                 )
                 no_file_label.pack(pady=20)
                 return
-            
+
             with open(data_file, 'r') as f:
                 data = json.load(f)
                 all_subtasks = data.get("subtasks", [])
-            
+
             # Filter subtasks for this task
             task_subtasks = [s for s in all_subtasks if s.get('task_id', '') == self.task.get('id', '')]
-            
+
             if not task_subtasks:
                 no_subtasks_label = ctk.CTkLabel(
                     self.subtasks_frame,
@@ -8377,18 +8773,18 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
                 )
                 no_subtasks_label.pack(pady=40)
                 return
-            
+
             # Sort by creation date
             sorted_subtasks = sorted(
                 task_subtasks,
                 key=lambda s: datetime.strptime(s.get('created_date', '2000-01-01 00:00:00'), "%Y-%m-%d %H:%M:%S"),
                 reverse=True
             )
-            
+
             # Display each subtask
             for subtask in sorted_subtasks:
                 self.create_subtask_item(subtask)
-        
+
         except Exception as e:
             error_label = ctk.CTkLabel(
                 self.subtasks_frame,
@@ -8543,35 +8939,51 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
     def toggle_completion(self, subtask, completed):
         """Toggle subtask completion"""
         try:
-            # Get app reference
-            if hasattr(self.parent, 'parent'):  # TaskDialog
-                app = self.parent.parent.app
-            else:  # Direct from app
+            # Get app reference - Fixed logic
+            if hasattr(self.parent, 'app'):  # Direct from app frame (SubtasksFrame, etc.)
                 app = self.parent.app
-            
+            elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+                app = self.parent.parent.app
+            else:
+                # Fallback: try to find app through the widget hierarchy
+                current = self.parent
+                app = None
+                while current and app is None:
+                    if hasattr(current, 'app'):
+                        app = current.app
+                        break
+                    elif hasattr(current, 'parent'):
+                        current = current.parent
+                    else:
+                        break
+                    
+                if app is None:
+                    messagebox.showerror("Error", "Could not find app reference")
+                    return
+
             student_data = app.students.get(app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
-            
+
             # Load data
             with open(data_file, 'r') as f:
                 data = json.load(f)
-            
+
             # Update subtask
             current_user = "Teacher" if app.app_mode == "teacher" else "Student"
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
             subtasks = data.get("subtasks", [])
             for i, s in enumerate(subtasks):
                 if s.get('id', '') == subtask.get('id', ''):
                     subtasks[i]['completed'] = completed
                     subtasks[i]['last_modified'] = current_time
                     subtasks[i]['last_modified_by'] = current_user
-                    
+
                     if completed:
                         subtasks[i]['completion_date'] = current_time
                         subtasks[i]['completed_by'] = current_user
@@ -8581,15 +8993,15 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
                         if 'completed_by' in subtasks[i]:
                             del subtasks[i]['completed_by']
                     break
-            
+                
             data["subtasks"] = subtasks
-            
+
             # Save data
             with open(data_file, 'w') as f:
                 json.dump(data, f, indent=2)
-            
+
             self.load_subtasks()  # Refresh list
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
     
@@ -8599,41 +9011,57 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
             "Confirm Delete",
             f"Are you sure you want to delete the subtask '{subtask.get('title', '')}'?"
         )
-        
+
         if not confirm:
             return
-        
+
         try:
             # Get app reference
-            if hasattr(self.parent, 'parent'):  # TaskDialog
-                app = self.parent.parent.app
-            else:  # Direct from app
+            if hasattr(self.parent, 'app'):
                 app = self.parent.app
-            
+            elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+                app = self.parent.parent.app
+            else:
+                # Fallback: try to find app through the widget hierarchy
+                current = self.parent
+                app = None
+                while current and app is None:
+                    if hasattr(current, 'app'):
+                        app = current.app
+                        break
+                    elif hasattr(current, 'parent'):
+                        current = current.parent
+                    else:
+                        break
+                    
+                if app is None:
+                    messagebox.showerror("Error", "Could not find app reference")
+                    return
+
             student_data = app.students.get(app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
-            
+
             # Load data
             with open(data_file, 'r') as f:
                 data = json.load(f)
-            
+
             # Remove subtask
             subtasks = data.get("subtasks", [])
             subtasks = [s for s in subtasks if s.get('id', '') != subtask.get('id', '')]
             data["subtasks"] = subtasks
-            
+
             # Save data
             with open(data_file, 'w') as f:
                 json.dump(data, f, indent=2)
-            
+
             self.load_subtasks()  # Refresh list
             messagebox.showinfo("Success", "Subtask deleted successfully")
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete subtask: {str(e)}")
     
@@ -8641,80 +9069,112 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
         """Save new subtask"""
         try:
             subtask_data['task_id'] = self.task.get('id', '')
-            
+
             # Get app reference
-            if hasattr(self.parent, 'parent'):  # TaskDialog
-                app = self.parent.parent.app
-            else:  # Direct from app
+            if hasattr(self.parent, 'app'):
                 app = self.parent.app
-            
+            elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+                app = self.parent.parent.app
+            else:
+                # Fallback: try to find app through the widget hierarchy
+                current = self.parent
+                app = None
+                while current and app is None:
+                    if hasattr(current, 'app'):
+                        app = current.app
+                        break
+                    elif hasattr(current, 'parent'):
+                        current = current.parent
+                    else:
+                        break
+                    
+                if app is None:
+                    messagebox.showerror("Error", "Could not find app reference")
+                    return
+
             student_data = app.students.get(app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
-            
+
             # Load existing data
             if os.path.exists(data_file):
                 with open(data_file, 'r') as f:
                     data = json.load(f)
             else:
                 data = {"tasks": [], "notes": [], "goals": []}
-            
+
             # Add subtasks array if it doesn't exist
             if "subtasks" not in data:
                 data["subtasks"] = []
-            
+
             # Add new subtask
             data["subtasks"].append(subtask_data)
-            
+
             # Save updated data
             with open(data_file, 'w') as f:
                 json.dump(data, f, indent=2)
-            
+
             messagebox.showinfo("Success", "Subtask added successfully")
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
-    
+
     def update_subtask(self, subtask_data):
         """Update existing subtask"""
         try:
-            # Get app reference
-            if hasattr(self.parent, 'parent'):  # TaskDialog
-                app = self.parent.parent.app
-            else:  # Direct from app
+            # Get app reference 
+            if hasattr(self.parent, 'app'):
                 app = self.parent.app
-            
+            elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+                app = self.parent.parent.app
+            else:
+                # Fallback: try to find app through the widget hierarchy
+                current = self.parent
+                app = None
+                while current and app is None:
+                    if hasattr(current, 'app'):
+                        app = current.app
+                        break
+                    elif hasattr(current, 'parent'):
+                        current = current.parent
+                    else:
+                        break
+                    
+                if app is None:
+                    messagebox.showerror("Error", "Could not find app reference")
+                    return
+
             student_data = app.students.get(app.current_student, {})
             data_path = student_data.get("data_path", "")
-            
+
             if not data_path:
                 return
-            
+
             data_file = os.path.join(data_path, "progress_data.json")
-            
+
             # Load data
             with open(data_file, 'r') as f:
                 data = json.load(f)
-            
+
             # Update subtask
             subtasks = data.get("subtasks", [])
             for i, s in enumerate(subtasks):
                 if s.get('id', '') == subtask_data.get('id', ''):
                     subtasks[i] = subtask_data
                     break
-            
+                
             data["subtasks"] = subtasks
-            
+
             # Save data
             with open(data_file, 'w') as f:
                 json.dump(data, f, indent=2)
-            
+
             messagebox.showinfo("Success", "Subtask updated successfully")
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to update subtask: {str(e)}")
 
@@ -8831,6 +9291,125 @@ class SubtaskDialog(ctk.CTkToplevel):
         self.assignee_var.set(self.existing_subtask.get('assignee', 'Student'))
         self.completed_var.set(self.existing_subtask.get('completed', False))
     
+    def save_subtask_to_file(self, subtask_data, task_id):
+        """Save subtask to data file"""
+        try:
+            subtask_data['task_id'] = task_id
+    
+            # Get app reference - Fixed logic
+            if hasattr(self.parent, 'app'):  # Direct from app frame (SubtasksFrame, etc.)
+                app = self.parent.app
+            elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+                app = self.parent.parent.app
+            else:
+                # Fallback: try to find app through the widget hierarchy
+                current = self.parent
+                app = None
+                while current and app is None:
+                    if hasattr(current, 'app'):
+                        app = current.app
+                        break
+                    elif hasattr(current, 'parent'):
+                        current = current.parent
+                    else:
+                        break
+                    
+                if app is None:
+                    messagebox.showerror("Error", "Could not find app reference")
+                    return
+    
+            student_data = app.students.get(app.current_student, {})
+            data_path = student_data.get("data_path", "")
+    
+            if not data_path:
+                return
+    
+            data_file = os.path.join(data_path, "progress_data.json")
+    
+            # Load existing data
+            if os.path.exists(data_file):
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                data = {"tasks": [], "notes": [], "goals": []}
+    
+            # Add subtasks array if it doesn't exist
+            if "subtasks" not in data:
+                data["subtasks"] = []
+    
+            # Add new subtask
+            data["subtasks"].append(subtask_data)
+    
+            # Save updated data
+            with open(data_file, 'w') as f:
+                json.dump(data, f, indent=2)
+    
+            messagebox.showinfo("Success", "Subtask added successfully")
+    
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
+    
+    def update_subtasks_count(self):
+        """Update the subtasks count display"""
+        try:
+            task_to_use = self.existing_task if self.existing_task else self.task_data
+    
+            if not task_to_use:
+                self.subtasks_count_label.configure(text="")
+                return
+    
+            # Get app reference - Fixed logic
+            if hasattr(self.parent, 'app'):  # Direct from app frame (SubtasksFrame, etc.)
+                app = self.parent.app
+            elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+                app = self.parent.parent.app
+            else:
+                # Fallback: try to find app through the widget hierarchy
+                current = self.parent
+                app = None
+                while current and app is None:
+                    if hasattr(current, 'app'):
+                        app = current.app
+                        break
+                    elif hasattr(current, 'parent'):
+                        current = current.parent
+                    else:
+                        break
+                    
+                if app is None:
+                    self.subtasks_count_label.configure(text="Error loading count")
+                    return
+    
+            # Load subtasks for this task
+            student_data = app.students.get(app.current_student, {})
+            data_path = student_data.get("data_path", "")
+    
+            if not data_path:
+                self.subtasks_count_label.configure(text="")
+                return
+    
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                self.subtasks_count_label.configure(text="")
+                return
+    
+            with open(data_file, 'r') as f:
+                data = json.load(f)
+                subtasks = data.get("subtasks", [])
+    
+            # Count subtasks for this task
+            task_subtasks = [s for s in subtasks if s.get('task_id', '') == task_to_use.get('id', '')]
+            total_count = len(task_subtasks)
+            completed_count = len([s for s in task_subtasks if s.get('completed', False)])
+    
+            if total_count > 0:
+                self.subtasks_count_label.configure(text=f"Subtasks: {completed_count}/{total_count}")
+            else:
+                self.subtasks_count_label.configure(text="No subtasks")
+    
+        except Exception as e:
+            self.subtasks_count_label.configure(text="Error loading count")
+    
     def save_subtask(self):
         """Save subtask data"""
         title = self.title_entry.get().strip()
@@ -8842,8 +9421,29 @@ class SubtaskDialog(ctk.CTkToplevel):
         assignee = self.assignee_var.get()
         completed = self.completed_var.get()
         
-        # Get current user for tracking
-        current_user = "Teacher" if self.parent.app.app_mode == "teacher" else "Student"
+        # Get current user for tracking - Fixed logic
+        if hasattr(self.parent, 'app'):  # Direct from app frame (SubtasksFrame, etc.)
+            app = self.parent.app
+        elif hasattr(self.parent, 'parent') and hasattr(self.parent.parent, 'app'):  # TaskDialog -> parent frame -> app
+            app = self.parent.parent.app
+        else:
+            # Fallback: try to find app through the widget hierarchy
+            current = self.parent
+            app = None
+            while current and app is None:
+                if hasattr(current, 'app'):
+                    app = current.app
+                    break
+                elif hasattr(current, 'parent'):
+                    current = current.parent
+                else:
+                    break
+                
+            if app is None:
+                messagebox.showerror("Error", "Could not find app reference")
+                return
+        
+        current_user = "Teacher" if app.app_mode == "teacher" else "Student"
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         self.subtask_data = {
