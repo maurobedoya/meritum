@@ -2032,6 +2032,44 @@ class StudentSettingsFrame(ctk.CTkFrame):
         )
         self.desc_label.pack(anchor='w', pady=(10, 0))
 
+        # Subtasks Settings section
+        self.subtasks_frame = ctk.CTkFrame(self.main_container)
+        self.subtasks_frame.pack(fill='x', padx=20, pady=10)
+
+        self.subtasks_label = ctk.CTkLabel(
+            self.subtasks_frame,
+            text="Display Settings",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.subtasks_label.pack(anchor='w', padx=20, pady=10)
+
+        # Subtasks settings frame
+        self.subtasks_options_frame = ctk.CTkFrame(self.subtasks_frame, fg_color="transparent")
+        self.subtasks_options_frame.pack(fill='x', padx=20, pady=10)
+
+        # Subtasks settings button
+        self.subtasks_settings_btn = ctk.CTkButton(
+            self.subtasks_options_frame,
+            text="Subtasks Display Settings",
+            command=self.show_subtasks_settings,
+            width=180,
+            height=35
+        )
+        self.subtasks_settings_btn.pack(anchor='w', pady=5)
+
+        # Description
+        subtasks_desc = (
+            "Configure how subtasks are displayed on the Gantt chart, "
+            "including size, colors, and positioning."
+        )
+        self.subtasks_desc_label = ctk.CTkLabel(
+            self.subtasks_options_frame,
+            text=subtasks_desc,
+            wraplength=600,
+            justify="left"
+        )
+        self.subtasks_desc_label.pack(anchor='w', pady=(10, 0))
+
         # App information section
         self.about_frame = ctk.CTkFrame(self.main_container)
         self.about_frame.pack(fill='x', padx=20, pady=(20, 10))
@@ -2068,6 +2106,11 @@ class StudentSettingsFrame(ctk.CTkFrame):
         if hasattr(dialog, "path_changed") and dialog.path_changed:
             self.path_display.configure(text=self.app.student_data_path)
             # If applicable, refresh other data that might depend on the path
+
+    def show_subtasks_settings(self):
+        """Show subtasks settings dialog"""
+        dialog = SubtasksSettingsDialog(self)
+        self.wait_window(dialog)
 
 class AddStudentDialog(ctk.CTkToplevel):
     def __init__(self, parent):
@@ -11216,15 +11259,43 @@ class SettingsFrame(ctk.CTkFrame):
         )
         self.add_student_btn.pack(anchor='w', padx=20, pady=10)
 
+        # Subtasks Settings section
+        self.subtasks_frame = ctk.CTkFrame(self.main_container)
+        self.subtasks_frame.pack(fill='x', padx=20, pady=10)
+
+        self.subtasks_label = ctk.CTkLabel(
+            self.subtasks_frame,
+            text="Display Settings",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.subtasks_label.pack(anchor='w', padx=20, pady=10)
+
+        # Subtasks settings frame
+        self.subtasks_options_frame = ctk.CTkFrame(self.subtasks_frame, fg_color="transparent")
+        self.subtasks_options_frame.pack(fill='x', padx=20, pady=10)
+
         # Subtasks settings button
         self.subtasks_settings_btn = ctk.CTkButton(
-            self.students_frame,
+            self.subtasks_options_frame,
             text="Subtasks Display Settings",
             command=self.show_subtasks_settings,
             width=180,
             height=35
         )
-        self.subtasks_settings_btn.pack(anchor='w', padx=20, pady=5)
+        self.subtasks_settings_btn.pack(anchor='w', pady=5)
+
+        # Description
+        subtasks_desc = (
+            "Configure how subtasks are displayed on the Gantt chart, "
+            "including size, colors, and positioning."
+        )
+        self.subtasks_desc_label = ctk.CTkLabel(
+            self.subtasks_options_frame,
+            text=subtasks_desc,
+            wraplength=600,
+            justify="left"
+        )
+        self.subtasks_desc_label.pack(anchor='w', pady=(10, 0))
 
         # About section
         self.about_frame = ctk.CTkFrame(self.main_container)
