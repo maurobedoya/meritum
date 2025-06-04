@@ -9613,19 +9613,6 @@ class NotesFrame(ctk.CTkFrame):
         )
         self.goal_filter_menu.pack(side='left', padx=5)
 
-        # Add path management button when in student mode
-        if self.app.app_mode == "student":
-            self.path_frame = ctk.CTkFrame(self.control_panel, fg_color="transparent")
-            self.path_frame.pack(side='right', padx=10)
-
-            self.path_btn = ctk.CTkButton(
-                self.path_frame,
-                text="Manage Data Path",
-                command=self.show_path_manager,
-                width=150
-            )
-            self.path_btn.pack(side='left', padx=5)
-
         # Search bar
         self.search_frame = ctk.CTkFrame(self.control_panel, fg_color="transparent")
         self.search_frame.pack(side='right', padx=10)
@@ -9695,14 +9682,6 @@ class NotesFrame(ctk.CTkFrame):
         """Apply goal filter and then reapply the main filter"""
         # The full filtering will be done in apply_filter
         self.apply_filter(self.filter_var.get())
-
-    def show_path_manager(self):
-        """Show dialog to manage student data path"""
-        dialog = StudentPathManagerDialog(self)
-        self.wait_window(dialog)
-        # Reload data if path changed
-        if hasattr(dialog, "path_changed") and dialog.path_changed:
-            self.load_student_data()
 
     def load_student_data(self):
         """Load student notes data from JSON file"""
