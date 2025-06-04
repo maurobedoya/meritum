@@ -5,9 +5,28 @@ All notable changes to Meritum will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Subtask feature implementation.
 - Working on: Font size control by users
 
+
+## [0.3.0] - 2025-06-01
+
+### Added
+- **Report Tab**: New progress report with summary statistics, goals progress tracking, and GitHub-style activity timeline showing task completions, note creation, and milestone achievements.
+- **Substask feature**: Now, it is possible to add subtasks to main tasks and is displayed in points in the Gantt Chart
+- **Duplicate Task**: Added "Duplicate" button to Tasks tab, Gantt chart, and task details. Creates copy with reset progress and adjusted title.
+- **New create buttons**: Create new Tasks, Subtasks and Notes is possible now in every tab
+
+### Changed
+- **Edit Notes**: Users can now edit both title and content of existing notes
+- **Last Modified Tracking**: Notes show when they were last modified
+- **Scrollable Notes Display**: Notes in Task Details are now displayed in a scrollable format
+- **Search box**: The search box now updates as you type
+
+### Fixed
+- Were removed special characters that were not displayed
+- Add subtask button in the Gantt Chart timeline was deactivated
+- Filtering by goals in the Gantt Chart was fixed
+- Search was fixed in Tasks, Subtasks and Notes tabs
 
 ## [0.2.9] - 2025-05-12
 
@@ -54,7 +73,8 @@ All notable changes to Meritum will be documented in this file.
 - Path selection issues in student mode
 
 
-[Unreleased]: https://github.com/maurobedoya/meritum/compare/v0.2.9...HEAD
+[Unreleased]: https://github.com/maurobedoya/meritum/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/maurobedoya/meritum/compare/v0.2.9...v0.3.0
 [0.2.9]: https://github.com/maurobedoya/meritum/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/maurobedoya/meritum/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/maurobedoya/meritum/releases/v0.2.7
