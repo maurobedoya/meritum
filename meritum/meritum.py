@@ -150,7 +150,7 @@ class ConfigManager:
                 "not_completed": "#000000"
             }
         }
-    
+
     def save_config(self):
         """Save configuration to file"""
         try:
@@ -973,6 +973,9 @@ class ProfileFrame(ctk.CTkFrame):
             if hasattr(self, 'message_label') and self.message_label.winfo_exists():
                 self.message_label.destroy()
 
+            # Clear ALL form fields first to prevent old data from persisting
+            self.clear_all_fields()
+
             # Enable form fields
             self.set_form_state("normal")
 
@@ -980,6 +983,8 @@ class ProfileFrame(ctk.CTkFrame):
             data_path = student_data.get("data_path", "")
 
             if not data_path:
+                self.set_form_state("disabled")
+                self.show_no_student_message()
                 return
 
             # Load student config
@@ -987,53 +992,68 @@ class ProfileFrame(ctk.CTkFrame):
             if os.path.exists(config_path):
                 with open(config_path, 'r') as f:
                     config_data = json.load(f)
-
+    
                 if self.app.current_student in config_data:
                     self.student_data = config_data[self.app.current_student]
-
-                    # Populate form fields
-                    self.name_entry.delete(0, 'end')
+    
+                    # Populate form fields with new data
                     self.name_entry.insert(0, self.app.current_student)
-
+    
                     if "email" in self.student_data:
-                        self.email_entry.delete(0, 'end')
                         self.email_entry.insert(0, self.student_data["email"])
-
+    
                     if "program" in self.student_data:
-                        self.program_entry.delete(0, 'end')
                         self.program_entry.insert(0, self.student_data["program"])
-
+    
                     if "start_date" in self.student_data:
-                        self.start_entry.delete(0, 'end')
                         self.start_entry.insert(0, self.student_data["start_date"])
-
+    
                     if "end_date" in self.student_data:
-                        self.end_entry.delete(0, 'end')
                         self.end_entry.insert(0, self.student_data["end_date"])
-
+    
                     if "supervisor" in self.student_data:
-                        self.supervisor_entry.delete(0, 'end')
                         self.supervisor_entry.insert(0, self.student_data["supervisor"])
-
+    
                     if "research_area" in self.student_data:
-                        self.research_entry.delete(0, 'end')
                         self.research_entry.insert(0, self.student_data["research_area"])
-
-                    # Add the new fields
+    
                     if "birth_date" in self.student_data:
-                        self.birth_date_entry.delete(0, 'end')
                         self.birth_date_entry.insert(0, self.student_data["birth_date"])
-
+    
                     if "profession" in self.student_data:
-                        self.profession_entry.delete(0, 'end')
                         self.profession_entry.insert(0, self.student_data["profession"])
-
+    
                     if "telephone" in self.student_data:
-                        self.telephone_entry.delete(0, 'end')
                         self.telephone_entry.insert(0, self.student_data["telephone"])
-
+                else:
+                    # Student not found in config, clear fields and disable
+                    self.set_form_state("disabled")
+                    self.show_no_student_message()
+            else:
+                # No config file found, clear fields and disable
+                self.set_form_state("disabled")
+                self.show_no_student_message()
+    
         except Exception as e:
+            # Clear fields on error and show message
+            self.clear_all_fields()
+            self.set_form_state("disabled")
             messagebox.showerror("Error", f"Failed to load profile data: {str(e)}")
+
+    def clear_all_fields(self):
+        """Clear all form fields"""
+        try:
+            # Clear all entry fields
+            for entry in [
+                self.name_entry, self.email_entry, self.program_entry,
+                self.start_entry, self.end_entry, self.supervisor_entry,
+                self.research_entry, self.birth_date_entry, self.profession_entry,
+                self.telephone_entry
+            ]:
+                if hasattr(entry, 'delete'):
+                    entry.delete(0, 'end')
+        except Exception as e:
+            print(f"Error clearing fields: {str(e)}")
 
     def save_profile(self):
         """Save student profile data"""
@@ -1764,14 +1784,18 @@ class StudentProgressApp(ctk.CTk):
                     self.current_frame.apply_filter(self.current_frame.filter_var.get())
 
             elif isinstance(self.current_frame, ProfileFrame):
-                # For profile frame, also handle enabling/disabling fields
+                # For profile frame, handle enabling/disabling fields properly
                 if self.current_student and self.current_student != "Add a student...":
+                    # First clear all fields, then load new data
+                    self.current_frame.clear_all_fields()
                     self.current_frame.load_student_data()
                     self.current_frame.set_form_state("normal")
                     # Clear any existing message
                     if hasattr(self.current_frame, 'message_label') and self.current_frame.message_label.winfo_exists():
                         self.current_frame.message_label.destroy()
                 else:
+                    # Clear fields and disable when no student selected
+                    self.current_frame.clear_all_fields()
                     self.current_frame.set_form_state("disabled")
                     self.current_frame.show_no_student_message()
 
