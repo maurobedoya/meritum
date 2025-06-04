@@ -1458,7 +1458,7 @@ class StudentProgressApp(ctk.CTk):
         )
         self.profile_btn.pack(pady=10)
 
-        # Add Goals button
+        # Goals button
         self.goals_btn = ctk.CTkButton(
             self.sidebar,
             text="Goals",
