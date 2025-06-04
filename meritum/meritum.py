@@ -1897,7 +1897,7 @@ class StudentSettingsFrame(ctk.CTkFrame):
     
     def setup_ui(self):
         # Create main container
-        self.main_container = ctk.CTkFrame(self, fg_color=COLOR_SCHEME['content_bg'])
+        self.main_container = ctk.CTkScrollableFrame(self, fg_color=COLOR_SCHEME['content_bg'])
         self.main_container.pack(fill='both', expand=True, padx=20, pady=20)
 
         # Settings title
@@ -11083,7 +11083,7 @@ class SettingsFrame(ctk.CTkFrame):
     
     def setup_ui(self):
         # Create main container
-        self.main_container = ctk.CTkFrame(self, fg_color=COLOR_SCHEME['content_bg'])
+        self.main_container = ctk.CTkScrollableFrame(self, fg_color=COLOR_SCHEME['content_bg'])
         self.main_container.pack(fill='both', expand=True, padx=20, pady=20)
 
         # Settings title
