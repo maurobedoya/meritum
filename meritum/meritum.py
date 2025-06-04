@@ -72,8 +72,8 @@ COLOR_SCHEME = {
     'task_completed': '#28a745',  # Green for completed tasks of unassigned tasks to any objective.
     'milestone': '#ffc107',     # Yellow for milestones
     # Subtask settings
-    'subtask_student_border': '#1f6aa5',     # Blue border for student subtasks
-    'subtask_teacher_border': '#28a745',     # Green border for teacher subtasks
+    'subtask_student_border': '#b46aa5',     # Blue border for student subtasks
+    'subtask_teacher_border': '#d1884D',     # Green border for teacher subtasks
     'subtask_not_completed': '#000000',      # Black fill for not completed
     'subtask_completed_fill': 'border_color', # Use border color for completed
     'subtask_size': 8,                       # Default subtask circle size
@@ -143,8 +143,8 @@ class ConfigManager:
             "subtasks_config": {
                 "size": 8,
                 "thickness": 2,
-                "student_border": "#1f6aa5",
-                "teacher_border": "#28a745",
+                "student_border": "#b46aa5",
+                "teacher_border": "#d1884D",
                 "position_mode": "online",
                 "spacing": 4,
                 "not_completed": "#000000"
@@ -249,8 +249,8 @@ class ConfigManager:
             subtasks_config = {
                 "size": 8,
                 "thickness": 2,
-                "student_border": "#1f6aa5",
-                "teacher_border": "#28a745",
+                "student_border": "#b46aa5",
+                "teacher_border": "#d1884D",
                 "position_mode": "online",
                 "spacing": 4,
                 "not_completed": "#000000"
@@ -1218,8 +1218,8 @@ class StudentProgressApp(ctk.CTk):
             if subtasks_config:
                 COLOR_SCHEME['subtask_size'] = subtasks_config.get("size", 8)
                 COLOR_SCHEME['subtask_thickness'] = subtasks_config.get("thickness", 2)
-                COLOR_SCHEME['subtask_student_border'] = subtasks_config.get("student_border", "#1f6aa5")
-                COLOR_SCHEME['subtask_teacher_border'] = subtasks_config.get("teacher_border", "#28a745")
+                COLOR_SCHEME['subtask_student_border'] = subtasks_config.get("student_border", "#b46aa5")
+                COLOR_SCHEME['subtask_teacher_border'] = subtasks_config.get("teacher_border", "#d1884D")
                 COLOR_SCHEME['subtask_position_mode'] = subtasks_config.get("position_mode", "online")
                 COLOR_SCHEME['subtask_spacing'] = subtasks_config.get("spacing", 4)
                 COLOR_SCHEME['subtask_not_completed'] = subtasks_config.get("not_completed", "#000000")
@@ -4340,7 +4340,7 @@ class GanttChartFrame(ctk.CTkFrame):
             self.draw_subtask_row(
                 student_subtasks, 
                 x1, x2, student_y,
-                COLOR_SCHEME.get('subtask_student_border', '#1f6aa5'),
+                COLOR_SCHEME.get('subtask_student_border', '#b46aa5'),
                 subtask_size, subtask_thickness
             )
 
@@ -4349,7 +4349,7 @@ class GanttChartFrame(ctk.CTkFrame):
             self.draw_subtask_row(
                 teacher_subtasks, 
                 x1, x2, teacher_y,
-                COLOR_SCHEME.get('subtask_teacher_border', '#28a745'),
+                COLOR_SCHEME.get('subtask_teacher_border', '#d1884D'),
                 subtask_size, subtask_thickness
             )
 
@@ -7559,9 +7559,9 @@ class TaskViewDialog(ctk.CTkToplevel):
         completed = subtask.get('completed', False)
 
         if assignee == 'Student':
-            border_color = COLOR_SCHEME.get('subtask_student_border', '#1f6aa5')
+            border_color = COLOR_SCHEME.get('subtask_student_border', '#b46aa5')
         else:
-            border_color = COLOR_SCHEME.get('subtask_teacher_border', '#28a745')
+            border_color = COLOR_SCHEME.get('subtask_teacher_border', '#d1884D')
 
         fill_color = border_color if completed else COLOR_SCHEME.get('subtask_not_completed', '#000000')
 
@@ -8837,9 +8837,9 @@ class TaskSubtasksManagerDialog(ctk.CTkToplevel):
         completed = subtask.get('completed', False)
         
         if assignee == 'Student':
-            border_color = COLOR_SCHEME.get('subtask_student_border', '#1f6aa5')
+            border_color = COLOR_SCHEME.get('subtask_student_border', '#b46aa5')
         else:
-            border_color = COLOR_SCHEME.get('subtask_teacher_border', '#28a745')
+            border_color = COLOR_SCHEME.get('subtask_teacher_border', '#d1884D')
         
         fill_color = border_color if completed else COLOR_SCHEME.get('subtask_not_completed', '#000000')
         
