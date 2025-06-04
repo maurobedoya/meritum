@@ -1514,6 +1514,18 @@ class StudentProgressApp(ctk.CTk):
         )
         self.notes_btn.pack(pady=10)
 
+        # Report button
+        self.report_btn = ctk.CTkButton(
+            self.sidebar,
+            text="Report",
+            command=self.show_report_frame,
+            width=150,
+            height=40,
+            fg_color=self.BUTTON_COLORS['inactive'],
+            hover_color=self.BUTTON_COLORS['hover_inactive']
+        )
+        self.report_btn.pack(pady=10)
+
         # Show settings button in both teacher and student mode, but with different functionality
         self.settings_btn = ctk.CTkButton(
             self.sidebar,
@@ -1613,10 +1625,23 @@ class StudentProgressApp(ctk.CTk):
         # Update button colors
         self.update_button_colors("profile")
 
+    def show_report_frame(self):
+        """Show the report frame"""
+        # Clear main content
+        for widget in self.main_content.winfo_children():
+            widget.destroy()
+
+        # Create report frame
+        self.current_frame = ReportFrame(self.main_content, self)
+        self.current_frame.pack(fill='both', expand=True)
+
+        # Update button colors
+        self.update_button_colors("report")
+
     def update_button_colors(self, active_button):
         """Update button colors based on which view is active"""
         # Reset all buttons to inactive
-        buttons = ['profile', 'goals', 'gantt', 'tasks', 'subtasks', 'notes']
+        buttons = ['profile', 'goals', 'gantt', 'tasks', 'subtasks', 'notes', 'report']
         button_widgets = {
             'profile': self.profile_btn,
             'goals': self.goals_btn,
@@ -1624,6 +1649,7 @@ class StudentProgressApp(ctk.CTk):
             'tasks': self.tasks_btn,
             'subtasks': self.subtasks_btn,
             'notes': self.notes_btn,
+            'report': self.report_btn,
         }
 
         # Only add settings button if it exists (teacher mode)
@@ -12184,6 +12210,823 @@ class ModeSelectionAppStandalone:
         self.root.grab_release()
         self.root.quit()
         self.root.destroy()
+
+class ReportFrame(ctk.CTkFrame):
+    def __init__(self, parent, app):
+        super().__init__(parent, fg_color="transparent")
+        self.app = app
+        
+        # Report data
+        self.tasks = []
+        self.subtasks = []
+        self.notes = []
+        self.goals = []
+        
+        # Setup UI
+        self.setup_ui()
+        
+        # Load data if student is selected
+        if self.app.current_student and self.app.current_student != "Add a student...":
+            self.load_student_data()
+    
+    def setup_ui(self):
+        # Create main scrollable container
+        self.main_container = ctk.CTkScrollableFrame(self, fg_color=COLOR_SCHEME['content_bg'])
+        self.main_container.pack(fill='both', expand=True, padx=20, pady=20)
+
+        # Report title
+        self.title_label = ctk.CTkLabel(
+            self.main_container,
+            text="Progress Report",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        self.title_label.pack(anchor='w', padx=20, pady=20)
+
+        # Summary statistics section
+        self.create_summary_section()
+
+        # Goals progress section
+        self.create_goals_section()
+
+        # GitHub-style activity chart section
+        self.create_activity_chart_section()
+
+    def create_summary_section(self):
+        """Create the summary statistics section"""
+        self.summary_frame = ctk.CTkFrame(self.main_container)
+        self.summary_frame.pack(fill='x', padx=20, pady=10)
+
+        self.summary_title = ctk.CTkLabel(
+            self.summary_frame,
+            text="Summary Statistics",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.summary_title.pack(anchor='w', padx=20, pady=10)
+
+        # Create grid for statistics
+        self.stats_grid = ctk.CTkFrame(self.summary_frame, fg_color="transparent")
+        self.stats_grid.pack(fill='x', padx=20, pady=10)
+
+    def create_goals_section(self):
+        """Create the goals progress section"""
+        self.goals_frame = ctk.CTkFrame(self.main_container)
+        self.goals_frame.pack(fill='x', padx=20, pady=10)
+
+        self.goals_title = ctk.CTkLabel(
+            self.goals_frame,
+            text="Goals Progress",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.goals_title.pack(anchor='w', padx=20, pady=10)
+
+        # Goals content will be populated by update_goals_progress
+        self.goals_content = ctk.CTkFrame(self.goals_frame, fg_color="transparent")
+        self.goals_content.pack(fill='x', padx=20, pady=10)
+
+    def create_activity_chart_section(self):
+        """Create the GitHub-style activity chart section"""
+        self.chart_frame = ctk.CTkFrame(self.main_container)
+        self.chart_frame.pack(fill='x', padx=20, pady=10)
+
+        self.chart_title = ctk.CTkLabel(
+            self.chart_frame,
+            text="Activity Timeline",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.chart_title.pack(anchor='w', padx=20, pady=10)
+
+        # Activity chart canvas
+        self.chart_canvas = tk.Canvas(
+            self.chart_frame,
+            bg=COLOR_SCHEME['content_inside_bg'],
+            highlightthickness=0
+        )
+        self.chart_canvas.pack(fill='x', padx=20, pady=10)
+
+        # Legend frame
+        self.legend_frame = ctk.CTkFrame(self.chart_frame, fg_color="transparent")
+        self.legend_frame.pack(fill='x', padx=20, pady=(0, 10))
+
+    def create_detailed_section(self):
+        """Create the detailed breakdown section"""
+        self.detailed_frame = ctk.CTkFrame(self.main_container)
+        self.detailed_frame.pack(fill='x', padx=20, pady=10)
+
+        self.detailed_title = ctk.CTkLabel(
+            self.detailed_frame,
+            text="Detailed Breakdown",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.detailed_title.pack(anchor='w', padx=20, pady=10)
+
+        # Detailed content will be populated by update_detailed_breakdown
+        self.detailed_content = ctk.CTkFrame(self.detailed_frame, fg_color="transparent")
+        self.detailed_content.pack(fill='x', padx=20, pady=10)
+
+    def load_student_data(self):
+        """Load student data from JSON file"""
+        try:
+            # Clear existing content
+            self.clear_all_content()
+
+            if not self.app.current_student or self.app.current_student == "Add a student...":
+                self.show_no_student_message()
+                return
+
+            # Get student data
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                self.show_no_data_message()
+                return
+
+            data_file = os.path.join(data_path, "progress_data.json")
+            if not os.path.exists(data_file):
+                # Create default data file
+                default_data = {
+                    "tasks": [],
+                    "notes": [],
+                    "goals": [],
+                    "subtasks": []
+                }
+                with open(data_file, 'w') as f:
+                    json.dump(default_data, f, indent=2)
+                self.tasks = []
+                self.subtasks = []
+                self.notes = []
+                self.goals = []
+            else:
+                with open(data_file, 'r') as f:
+                    data = json.load(f)
+                    self.tasks = data.get("tasks", [])
+                    self.subtasks = data.get("subtasks", [])
+                    self.notes = data.get("notes", [])
+                    self.goals = data.get("goals", [])
+
+            # Update all sections
+            self.update_summary_stats()
+            self.update_goals_progress()
+            self.update_activity_chart()
+
+        except Exception as e:
+            self.show_error_message(f"Error loading data: {str(e)}")
+
+    def clear_all_content(self):
+        """Clear all dynamic content"""
+        # Clear summary stats
+        for widget in self.stats_grid.winfo_children():
+            widget.destroy()
+        
+        # Clear goals content
+        for widget in self.goals_content.winfo_children():
+            widget.destroy()
+        
+        # Clear chart
+        self.chart_canvas.delete("all")
+        
+        # Clear legend
+        for widget in self.legend_frame.winfo_children():
+            widget.destroy()
+
+    def show_no_student_message(self):
+        """Show message when no student is selected"""
+        message = ctk.CTkLabel(
+            self.stats_grid,
+            text="Please select a student to view report",
+            font=ctk.CTkFont(size=14)
+        )
+        message.pack(pady=20)
+
+    def show_no_data_message(self):
+        """Show message when no data path is available"""
+        message = ctk.CTkLabel(
+            self.stats_grid,
+            text="No data path set for this student",
+            font=ctk.CTkFont(size=14)
+        )
+        message.pack(pady=20)
+
+    def show_error_message(self, error_text):
+        """Show error message"""
+        message = ctk.CTkLabel(
+            self.stats_grid,
+            text=error_text,
+            font=ctk.CTkFont(size=14),
+            text_color="#ff6b6b"
+        )
+        message.pack(pady=20)
+
+    def update_summary_stats(self):
+        """Update the summary statistics section"""
+        # Calculate statistics
+        total_tasks = len(self.tasks)
+        completed_tasks = len([t for t in self.tasks if t.get('completed', False)])
+        total_subtasks = len(self.subtasks)
+        completed_subtasks = len([s for s in self.subtasks if s.get('completed', False)])
+        total_notes = len(self.notes)
+        total_goals = len(self.goals)
+        
+        # Calculate completion percentages
+        task_completion = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+        subtask_completion = (completed_subtasks / total_subtasks * 100) if total_subtasks > 0 else 0
+        
+        # Milestone statistics
+        milestones = [t for t in self.tasks if t.get('is_milestone', False)]
+        completed_milestones = [t for t in milestones if t.get('completed', False)]
+        
+        # Statistics data
+        stats_data = [
+            ("Total Tasks", total_tasks, "#1f6aa5"),
+            ("Completed Tasks", completed_tasks, "#28a745"),
+            ("Task Completion", f"{task_completion:.1f}%", "#28a745"),
+            ("Total Subtasks", total_subtasks, "#6f42c1"),
+            ("Completed Subtasks", completed_subtasks, "#28a745"),
+            ("Subtask Completion", f"{subtask_completion:.1f}%", "#28a745"),
+            ("Total Notes", total_notes, "#fd7e14"),
+            ("Total Goals", total_goals, "#ffc107"),
+            ("Milestones", len(milestones), "#dc3545"),
+            ("Completed Milestones", len(completed_milestones), "#28a745")
+        ]
+
+        # Create grid layout for statistics
+        for i, (label, value, color) in enumerate(stats_data):
+            row = i // 3
+            col = i % 3
+            
+            stat_frame = ctk.CTkFrame(self.stats_grid)
+            stat_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
+            
+            # Configure grid weights for even distribution
+            self.stats_grid.grid_columnconfigure(col, weight=1)
+            
+            value_label = ctk.CTkLabel(
+                stat_frame,
+                text=str(value),
+                font=ctk.CTkFont(size=20, weight="bold"),
+                text_color=color
+            )
+            value_label.pack(pady=(10, 0))
+            
+            label_text = ctk.CTkLabel(
+                stat_frame,
+                text=label,
+                font=ctk.CTkFont(size=12)
+            )
+            label_text.pack(pady=(0, 10))
+
+    def update_goals_progress(self):
+        """Update the goals progress section"""
+        if not self.goals:
+            no_goals_label = ctk.CTkLabel(
+                self.goals_content,
+                text="No goals defined yet",
+                font=ctk.CTkFont(size=12)
+            )
+            no_goals_label.pack(pady=10)
+            return
+
+        # Create header
+        header_frame = ctk.CTkFrame(self.goals_content, fg_color=COLOR_SCHEME['inactive'])
+        header_frame.pack(fill='x', pady=(0, 5))
+
+        header_labels = ["Goal", "Progress", "Tasks", "Completed", "Status"]
+        header_widths = [300, 100, 80, 80, 100]
+        
+        for i, (label, width) in enumerate(zip(header_labels, header_widths)):
+            header_label = ctk.CTkLabel(
+                header_frame,
+                text=label,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                width=width
+            )
+            header_label.pack(side='left', padx=5, pady=5)
+
+        # Display each goal with numbering
+        for index, goal in enumerate(self.goals):
+            goal_frame = ctk.CTkFrame(self.goals_content, fg_color="transparent")
+            goal_frame.pack(fill='x', pady=2)
+
+            # Goal number and title
+            numbered_title = f"{index + 1}. {goal.get('title', 'Untitled Goal')}"
+            title_label = ctk.CTkLabel(
+                goal_frame,
+                text=numbered_title,
+                width=300,
+                anchor="w",
+                wraplength=290  # Add this line to wrap long text
+            )
+            title_label.pack(side='left', padx=5, pady=5)
+
+            # Progress percentage
+            progress = goal.get('progress', 0)
+            progress_label = ctk.CTkLabel(
+                goal_frame,
+                text=f"{progress}%",
+                width=100,
+                text_color=self.get_progress_color(progress)
+            )
+            progress_label.pack(side='left', padx=5, pady=5)
+
+            # Task count
+            task_count = goal.get('task_count', 0)
+            task_label = ctk.CTkLabel(
+                goal_frame,
+                text=str(task_count),
+                width=80
+            )
+            task_label.pack(side='left', padx=5, pady=5)
+
+            # Completed count
+            completed_count = goal.get('completed_count', 0)
+            completed_label = ctk.CTkLabel(
+                goal_frame,
+                text=str(completed_count),
+                width=80
+            )
+            completed_label.pack(side='left', padx=5, pady=5)
+
+            # Status
+            status = self.get_goal_status(progress)
+            status_label = ctk.CTkLabel(
+                goal_frame,
+                text=status,
+                width=100,
+                text_color=self.get_status_color(status)
+            )
+            status_label.pack(side='left', padx=5, pady=5)
+
+    def get_progress_color(self, progress):
+        """Get color based on progress percentage"""
+        if progress >= 90:
+            return "#28a745"  # Green
+        elif progress >= 70:
+            return "#ffc107"  # Yellow
+        elif progress >= 50:
+            return "#fd7e14"  # Orange
+        else:
+            return "#dc3545"  # Red
+
+    def get_goal_status(self, progress):
+        """Get status text based on progress"""
+        if progress >= 100:
+            return "Complete"
+        elif progress >= 75:
+            return "Near Complete"
+        elif progress >= 50:
+            return "In Progress"
+        elif progress >= 25:
+            return "Started"
+        else:
+            return "Not Started"
+
+    def get_status_color(self, status):
+        """Get color for status text"""
+        status_colors = {
+            "Complete": "#28a745",
+            "Near Complete": "#20c997", 
+            "In Progress": "#ffc107",
+            "Started": "#fd7e14",
+            "Not Started": "#dc3545"
+        }
+        return status_colors.get(status, "#6c757d")
+
+    def update_activity_chart(self):
+        """Update the GitHub-style activity chart"""
+        self.chart_canvas.delete("all")
+        
+        if not self.tasks:
+            # Show message when no tasks
+            canvas_width = self.chart_canvas.winfo_width()
+            canvas_height = self.chart_canvas.winfo_height()
+            if canvas_width <= 1:  # Canvas not initialized yet
+                self.chart_canvas.update()
+                canvas_width = self.chart_canvas.winfo_width()
+                canvas_height = self.chart_canvas.winfo_height()
+            
+            self.chart_canvas.create_text(
+                canvas_width // 2, canvas_height // 2,
+                text="No tasks available to display activity chart",
+                fill=COLOR_SCHEME['text'],
+                font=("Arial", 12)
+            )
+            return
+
+        # Calculate date range
+        start_date, end_date = self.calculate_date_range()
+        if not start_date or not end_date:
+            return
+
+        # Create activity data
+        activity_data = self.create_activity_data(start_date, end_date)
+        
+        # Draw the activity chart
+        self.draw_activity_chart(activity_data, start_date, end_date)
+        
+        # Create legend
+        self.create_activity_legend()
+
+    def calculate_date_range(self):
+        """Calculate the date range for the activity chart"""
+        try:
+            all_dates = []
+            
+            # Collect all relevant dates from tasks
+            for task in self.tasks:
+                try:
+                    start_date = datetime.strptime(task['start_date'], "%Y-%m-%d")
+                    end_date = datetime.strptime(task['end_date'], "%Y-%m-%d")
+                    all_dates.extend([start_date, end_date])
+                except (KeyError, ValueError):
+                    continue
+            
+            # Collect dates from subtasks
+            for subtask in self.subtasks:
+                try:
+                    created_date = datetime.strptime(subtask.get('created_date', ''), "%Y-%m-%d %H:%M:%S")
+                    all_dates.append(created_date)
+                except (ValueError, TypeError):
+                    continue
+            
+            # Collect dates from notes
+            for note in self.notes:
+                try:
+                    note_date = datetime.strptime(note.get('date', ''), "%Y-%m-%d %H:%M:%S")
+                    all_dates.append(note_date)
+                except (ValueError, TypeError):
+                    continue
+            
+            profile_dates = self.get_profile_dates()
+            if profile_dates:
+                all_dates.extend(profile_dates)
+
+            if not all_dates:
+                return None, None
+
+            min_date = min(all_dates)
+            max_date = max(all_dates)
+            
+            # Extend range to show more context
+            range_extension = timedelta(days=30)
+            chart_start = min_date - range_extension
+            chart_end = max_date + range_extension
+            
+            return chart_start, chart_end
+            
+        except Exception as e:
+            print(f"Error calculating date range: {e}")
+            return None, None
+
+    def get_profile_dates(self):
+        """Get start and expected end dates from student profile"""
+        try:
+            student_data = self.app.students.get(self.app.current_student, {})
+            data_path = student_data.get("data_path", "")
+
+            if not data_path:
+                return []
+
+            # Load student config to get profile dates
+            config_path = os.path.join(data_path, "student_config.json")
+            if not os.path.exists(config_path):
+                return []
+
+            with open(config_path, 'r') as f:
+                config_data = json.load(f)
+
+            if self.app.current_student not in config_data:
+                return []
+
+            student_profile = config_data[self.app.current_student]
+            profile_dates = []
+
+            # Get start date from profile
+            if 'start_date' in student_profile and student_profile['start_date']:
+                try:
+                    start_date = datetime.strptime(student_profile['start_date'], "%Y-%m-%d")
+                    profile_dates.append(start_date)
+                except ValueError:
+                    pass
+                
+            # Get expected end date from profile
+            if 'end_date' in student_profile and student_profile['end_date']:
+                try:
+                    end_date = datetime.strptime(student_profile['end_date'], "%Y-%m-%d")
+                    profile_dates.append(end_date)
+                except ValueError:
+                    pass
+                
+            return profile_dates
+
+        except Exception as e:
+            print(f"Error loading profile dates: {e}")
+            return []
+
+    def create_activity_data(self, start_date, end_date):
+        """Create activity data for each day in the range"""
+        activity_data = {}
+        current_date = start_date
+        
+        # Initialize all dates with empty activity
+        while current_date <= end_date:
+            date_key = current_date.strftime("%Y-%m-%d")
+            activity_data[date_key] = {
+                'tasks_started': 0,
+                'tasks_completed': 0,
+                'subtasks_created': 0,
+                'subtasks_completed': 0,
+                'notes_created': 0,
+                'milestones_completed': 0,
+                'total_activity': 0
+            }
+            current_date += timedelta(days=1)
+        
+        # Populate with actual activity data
+        # Task activities
+        for task in self.tasks:
+            try:
+                # Task started
+                start_date_str = task['start_date']
+                if start_date_str in activity_data:
+                    activity_data[start_date_str]['tasks_started'] += 1
+                    activity_data[start_date_str]['total_activity'] += 1
+                
+                # Task completed
+                if task.get('completed', False) and task.get('completion_date'):
+                    completion_date_str = task['completion_date']
+                    if completion_date_str in activity_data:
+                        if task.get('is_milestone', False):
+                            activity_data[completion_date_str]['milestones_completed'] += 1
+                            activity_data[completion_date_str]['total_activity'] += 3  # Milestones worth more
+                        else:
+                            activity_data[completion_date_str]['tasks_completed'] += 1
+                            activity_data[completion_date_str]['total_activity'] += 2
+            except (KeyError, ValueError):
+                continue
+        
+        # Subtask activities
+        for subtask in self.subtasks:
+            try:
+                # Subtask created
+                created_date = datetime.strptime(subtask.get('created_date', ''), "%Y-%m-%d %H:%M:%S")
+                created_date_str = created_date.strftime("%Y-%m-%d")
+                if created_date_str in activity_data:
+                    activity_data[created_date_str]['subtasks_created'] += 1
+                    activity_data[created_date_str]['total_activity'] += 1
+                
+                # Subtask completed
+                if subtask.get('completed', False) and subtask.get('completion_date'):
+                    completion_date = datetime.strptime(subtask['completion_date'], "%Y-%m-%d %H:%M:%S")
+                    completion_date_str = completion_date.strftime("%Y-%m-%d")
+                    if completion_date_str in activity_data:
+                        activity_data[completion_date_str]['subtasks_completed'] += 1
+                        activity_data[completion_date_str]['total_activity'] += 1
+            except (ValueError, TypeError):
+                continue
+        
+        # Note activities
+        for note in self.notes:
+            try:
+                note_date = datetime.strptime(note.get('date', ''), "%Y-%m-%d %H:%M:%S")
+                note_date_str = note_date.strftime("%Y-%m-%d")
+                if note_date_str in activity_data:
+                    activity_data[note_date_str]['notes_created'] += 1
+                    activity_data[note_date_str]['total_activity'] += 1
+            except (ValueError, TypeError):
+                continue
+        
+        return activity_data
+
+    def draw_activity_chart(self, activity_data, start_date, end_date):
+        """Draw the improved GitHub-style activity chart organized by year"""
+        # Update canvas size
+        self.chart_canvas.update()
+        
+
+        # Chart parameters
+        cell_size = 13
+        cell_spacing = 3
+        year_spacing = 60  # Space between years
+
+        # Get years covered FIRST
+        years = list(range(start_date.year, end_date.year + 1))
+
+        # NOW calculate canvas height
+        required_height = len(years) * (7 * (cell_size + cell_spacing) + year_spacing) + 100
+        canvas_height = required_height
+        self.chart_canvas.configure(height=canvas_height)
+        canvas_width = self.chart_canvas.winfo_width()
+
+        if canvas_width <= 1:
+            canvas_width = 800
+        if canvas_height <= 1:
+            canvas_height = 500
+
+        # Calculate maximum activity for color scaling
+        max_activity = max([data['total_activity'] for data in activity_data.values()]) if activity_data else 1
+        if max_activity == 0:
+            max_activity = 1
+
+        # Calculate chart dimensions
+        current_y = 50  # Starting Y position
+
+        for year in years:
+            # Get start and end dates for this year
+            year_start = max(start_date, datetime(year, 1, 1))
+            year_end = min(end_date, datetime(year, 12, 31))
+
+            if year_start > year_end:
+                continue
+
+            # Calculate weeks for this year
+            total_days = (year_end - year_start).days + 1
+            weeks = (total_days + 6) // 7
+
+            chart_width = weeks * (cell_size + cell_spacing)
+            start_x = 100  # Leave space for year label
+
+            # Draw year label on the right
+            self.chart_canvas.create_text(
+                start_x + chart_width + 20, current_y + 50,
+                text=str(year),
+                fill=COLOR_SCHEME['text'],
+                font=("Arial", 14, "bold"),
+                anchor="w"
+            )
+
+            # Draw month labels for this year
+            self.draw_year_months(year, year_start, year_end, start_x, current_y, cell_size, cell_spacing)
+
+            # Draw day labels (only for first year)
+            if True:
+                day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                for i, day_idx in enumerate([0, 1, 2, 3, 4, 5, 6]):
+                    y_pos = current_y + 25 + day_idx * (cell_size + cell_spacing) + cell_size // 2
+                    self.chart_canvas.create_text(
+                        start_x - 30, y_pos,
+                        text=day_names[i],
+                        fill=COLOR_SCHEME['text'],
+                        font=("Arial", 10),
+                        anchor="e"
+                    )
+
+            # Draw activity cells for this year
+            self.draw_year_cells(year, year_start, year_end, start_x, current_y + 25, 
+                               cell_size, cell_spacing, activity_data, max_activity)
+
+            # Move to next year row
+            current_y += 7 * (cell_size + cell_spacing) + year_spacing
+
+    def draw_year_months(self, year, year_start, year_end, start_x, start_y, cell_size, cell_spacing):
+        """Draw month labels for a specific year"""
+        current_date = year_start
+        week = 0
+        last_month = None
+        month_positions = []
+
+        while current_date <= year_end:
+            current_month = current_date.month
+
+            if current_month != last_month:
+                month_name = current_date.strftime("%b")
+                x_pos = start_x + week * (cell_size + cell_spacing)
+
+                month_positions.append({
+                    'month': month_name,
+                    'start_week': week,
+                    'x_pos': x_pos
+                })
+
+                last_month = current_month
+
+            current_date += timedelta(days=7)
+            week += 1
+
+        # Draw month labels centered
+        total_weeks = week
+        for i, month_info in enumerate(month_positions):
+            if i < len(month_positions) - 1:
+                next_start = month_positions[i + 1]['start_week']
+                month_width = (next_start - month_info['start_week']) * (cell_size + cell_spacing)
+            else:
+                month_width = (total_weeks - month_info['start_week']) * (cell_size + cell_spacing)
+
+            if month_width > 30:
+                center_x = month_info['x_pos'] + month_width // 2
+                self.chart_canvas.create_text(
+                    center_x, start_y,
+                    text=month_info['month'],
+                    fill=COLOR_SCHEME['text'],
+                    font=("Arial", 11, "bold"),
+                    anchor="center"
+                )
+
+    def draw_year_cells(self, year, year_start, year_end, start_x, start_y, 
+                       cell_size, cell_spacing, activity_data, max_activity):
+        """Draw activity cells for a specific year"""
+        current_date = year_start
+        week = 0
+        day_of_week = current_date.weekday()
+
+        while current_date <= year_end:
+            date_key = current_date.strftime("%Y-%m-%d")
+            activity = activity_data.get(date_key, {'total_activity': 0})['total_activity']
+
+            x = start_x + week * (cell_size + cell_spacing)
+            y = start_y + day_of_week * (cell_size + cell_spacing)
+
+            intensity = min(activity / max_activity, 1.0) if max_activity > 0 else 0
+            color = self.get_activity_color(intensity)
+
+            self.chart_canvas.create_rectangle(
+                x, y, x + cell_size, y + cell_size,
+                fill=color,
+                outline="#30363d",
+                width=1,
+                tags=("activity_cell",)
+            )
+
+            if activity >= max_activity * 0.7:
+                self.chart_canvas.create_oval(
+                    x + cell_size//2 - 2, y + cell_size//2 - 2,
+                    x + cell_size//2 + 2, y + cell_size//2 + 2,
+                    fill="white",
+                    outline="",
+                    tags=("activity_indicator",)
+                )
+
+            # Today indicator
+            today = datetime.now().date()
+            if current_date.date() == today:
+                self.chart_canvas.create_rectangle(
+                    x - 1, y - 1, x + cell_size + 1, y + cell_size + 1,
+                    outline="#f78166",
+                    width=2,
+                    fill="",
+                    tags=("today_indicator",)
+                )
+
+            current_date += timedelta(days=1)
+            day_of_week = (day_of_week + 1) % 7
+            if day_of_week == 0:
+                week += 1
+
+    def get_activity_color(self, intensity):
+        """Get GitHub-style color based on activity intensity"""
+        if intensity == 0:
+            return "#161b22"  # Dark background (no activity)
+        elif intensity <= 0.25:
+            return "#0e4429"  # Light green
+        elif intensity <= 0.5:
+            return "#006d32"  # Medium green
+        elif intensity <= 0.75:
+            return "#26a641"  # Green
+        else:
+            return "#39d353"  # Bright green
+
+    def create_activity_legend(self):
+        """Create legend for the activity chart"""
+        # Clear existing legend
+        for widget in self.legend_frame.winfo_children():
+            widget.destroy()
+        
+        # Legend title
+        legend_title = ctk.CTkLabel(
+            self.legend_frame,
+            text="Activity Levels:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        legend_title.pack(side='left', padx=(0, 10))
+        
+        # Less/More labels
+        less_label = ctk.CTkLabel(
+            self.legend_frame,
+            text="Less",
+            font=ctk.CTkFont(size=10)
+        )
+        less_label.pack(side='left', padx=(0, 5))
+        
+        # Legend color squares
+        legend_colors = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
+        
+        for color in legend_colors:
+            color_canvas = tk.Canvas(
+                self.legend_frame,
+                width=12,
+                height=12,
+                bg=COLOR_SCHEME['content_bg'],
+                highlightthickness=0
+            )
+            color_canvas.pack(side='left', padx=1)
+            color_canvas.create_rectangle(0, 0, 12, 12, fill=color, outline="")
+        
+        # More label
+        more_label = ctk.CTkLabel(
+            self.legend_frame,
+            text="More",
+            font=ctk.CTkFont(size=10)
+        )
+        more_label.pack(side='left', padx=(5, 0))
 
 def main():
     # Set appearance mode and default color theme
