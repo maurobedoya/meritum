@@ -9319,7 +9319,7 @@ class SubtaskDialog(ctk.CTkToplevel):
         """Save subtask to data file"""
         try:
             subtask_data['task_id'] = task_id
-    
+
             # Get app reference - Fixed logic
             if hasattr(self.parent, 'app'):  # Direct from app frame (SubtasksFrame, etc.)
                 app = self.parent.app
@@ -9341,47 +9341,47 @@ class SubtaskDialog(ctk.CTkToplevel):
                 if app is None:
                     messagebox.showerror("Error", "Could not find app reference")
                     return
-    
+
             student_data = app.students.get(app.current_student, {})
             data_path = student_data.get("data_path", "")
-    
+
             if not data_path:
                 return
-    
+
             data_file = os.path.join(data_path, "progress_data.json")
-    
+
             # Load existing data
             if os.path.exists(data_file):
                 with open(data_file, 'r') as f:
                     data = json.load(f)
             else:
                 data = {"tasks": [], "notes": [], "goals": []}
-    
+
             # Add subtasks array if it doesn't exist
             if "subtasks" not in data:
                 data["subtasks"] = []
-    
+
             # Add new subtask
             data["subtasks"].append(subtask_data)
-    
+
             # Save updated data
             with open(data_file, 'w') as f:
                 json.dump(data, f, indent=2)
-    
+
             messagebox.showinfo("Success", "Subtask added successfully")
-    
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save subtask: {str(e)}")
-    
+
     def update_subtasks_count(self):
         """Update the subtasks count display"""
         try:
             task_to_use = self.existing_task if self.existing_task else self.task_data
-    
+
             if not task_to_use:
                 self.subtasks_count_label.configure(text="")
                 return
-    
+
             # Get app reference - Fixed logic
             if hasattr(self.parent, 'app'):  # Direct from app frame (SubtasksFrame, etc.)
                 app = self.parent.app
@@ -9403,48 +9403,48 @@ class SubtaskDialog(ctk.CTkToplevel):
                 if app is None:
                     self.subtasks_count_label.configure(text="Error loading count")
                     return
-    
+
             # Load subtasks for this task
             student_data = app.students.get(app.current_student, {})
             data_path = student_data.get("data_path", "")
-    
+
             if not data_path:
                 self.subtasks_count_label.configure(text="")
                 return
-    
+
             data_file = os.path.join(data_path, "progress_data.json")
             if not os.path.exists(data_file):
                 self.subtasks_count_label.configure(text="")
                 return
-    
+
             with open(data_file, 'r') as f:
                 data = json.load(f)
                 subtasks = data.get("subtasks", [])
-    
+
             # Count subtasks for this task
             task_subtasks = [s for s in subtasks if s.get('task_id', '') == task_to_use.get('id', '')]
             total_count = len(task_subtasks)
             completed_count = len([s for s in task_subtasks if s.get('completed', False)])
-    
+
             if total_count > 0:
                 self.subtasks_count_label.configure(text=f"Subtasks: {completed_count}/{total_count}")
             else:
                 self.subtasks_count_label.configure(text="No subtasks")
-    
+
         except Exception as e:
             self.subtasks_count_label.configure(text="Error loading count")
-    
+
     def save_subtask(self):
         """Save subtask data"""
         title = self.title_entry.get().strip()
         if not title:
             messagebox.showerror("Error", "Please enter a subtask title")
             return
-        
+
         description = self.desc_text.get('1.0', 'end-1c').strip()
         assignee = self.assignee_var.get()
         completed = self.completed_var.get()
-        
+
         # Get current user for tracking - Fixed logic
         if hasattr(self.parent, 'app'):  # Direct from app frame (SubtasksFrame, etc.)
             app = self.parent.app
@@ -9466,10 +9466,10 @@ class SubtaskDialog(ctk.CTkToplevel):
             if app is None:
                 messagebox.showerror("Error", "Could not find app reference")
                 return
-        
+
         current_user = "Teacher" if app.app_mode == "teacher" else "Student"
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         self.subtask_data = {
             'id': self.existing_subtask.get('id', str(int(time.time()))) if self.existing_subtask else str(int(time.time())),
             'title': title,
@@ -9481,7 +9481,7 @@ class SubtaskDialog(ctk.CTkToplevel):
             'last_modified': current_time,
             'last_modified_by': current_user
         }
-        
+
         # Add completion info if completed
         if completed and not self.existing_subtask:
             self.subtask_data['completion_date'] = current_time
@@ -9489,7 +9489,7 @@ class SubtaskDialog(ctk.CTkToplevel):
         elif completed and self.existing_subtask and not self.existing_subtask.get('completed', False):
             self.subtask_data['completion_date'] = current_time
             self.subtask_data['completed_by'] = current_user
-        
+
         self.destroy()
 
 class NotesFrame(ctk.CTkFrame):
@@ -11080,7 +11080,7 @@ class SettingsFrame(ctk.CTkFrame):
         
         # Setup UI
         self.setup_ui()
-    
+
     def setup_ui(self):
         # Create main container
         self.main_container = ctk.CTkScrollableFrame(self, fg_color=COLOR_SCHEME['content_bg'])
