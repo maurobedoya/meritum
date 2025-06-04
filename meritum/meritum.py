@@ -3875,9 +3875,9 @@ class GanttChartFrame(ctk.CTkFrame):
         self.update_chart()
         
     def zoom_in(self):
-        """Increase zoom level by 20%"""
+        """Increase zoom level by 10%"""
         if self.zoom_factor < self.max_zoom:
-            self.zoom_factor += 0.2
+            self.zoom_factor += 0.1
             self.zoom_factor = min(self.zoom_factor, self.max_zoom)  # Ensure we don't exceed max
             self.update_zoom_indicator()
             self.app.gantt_zoom_factor = self.zoom_factor
@@ -3886,9 +3886,9 @@ class GanttChartFrame(ctk.CTkFrame):
             self.update_chart()
     
     def zoom_out(self):
-        """Decrease zoom level by 20%"""
+        """Decrease zoom level by 10%"""
         if self.zoom_factor > self.min_zoom:
-            self.zoom_factor -= 0.2
+            self.zoom_factor -= 0.1
             self.zoom_factor = max(self.zoom_factor, self.min_zoom)  # Ensure we don't go below min
             self.update_zoom_indicator()
             self.app.gantt_zoom_factor = self.zoom_factor
